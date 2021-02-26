@@ -1,0 +1,32 @@
+Reading input parameters
+ -> budget equations require Omega_smg = 6.878622e-01
+ -> budget equations require Omega_smg = 6.878622e-01
+ -> budget equations require Omega_smg = 6.878622e-01
+Root has been bracketed after 1 iterations: [0.67, 0.696793].
+ -> budget equations require Omega_smg = 6.878622e-01
+ -> budget equations require Omega_smg = 6.878622e-01
+ -> budget equations require Omega_smg = 6.878622e-01
+Computing unknown input parameters
+ -> found shooting_parameter_smg = 6.878622e-01
+ -> budget equations require Omega_smg = 6.878622e-01
+Running CLASS version v2.7.2
+Computing background
+ -> age = 13.578466 Gyr
+ -> conformal age = 14035.025268 Mpc
+ -> radiation/matter equality at z = 3402.964903
+    corresponding to conformal time = 112.800022 Mpc
+Computing thermodynamics with Y_He=0.2453
+ -> recombination at z = 1089.184869
+    corresponding to conformal time = 280.591903 Mpc
+    with comoving sound horizon = 144.703150 Mpc
+    angular diameter distance = 12.616606 Mpc
+    and sound horizon angle 100*theta_s = 1.052047
+ -> baryon drag stops at z = 1059.089448
+    corresponding to conformal time = 286.504904 Mpc
+    with comoving sound horizon rs = 147.384035 Mpc
+ -> reionization with optical depth = 0.092246
+    corresponding to conformal time = 4254.821128 Mpc
+Computing sources
+Computing unlensed linear spectra
+ -> sigma8=0.825404 (computed till k = 9.11685 h/Mpc)
+Writing output files in output/hi_cs2_... 
