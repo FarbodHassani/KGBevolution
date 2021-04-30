@@ -4,9 +4,9 @@
 //
 // Constants and metadata structures
 //
-// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London)
+// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London & Universität Zürich)
 //
-// Last modified: April 2019
+// Last modified: January 2021
 //
 //////////////////////////
 
@@ -31,6 +31,10 @@
 #define MAX_INTERSECTS 12
 #endif
 
+#ifndef LIGHTCONE_THICKNESS
+#define LIGHTCONE_THICKNESS 1
+#endif
+
 #ifndef LIGHTCONE_IDCHECK_ZONE
 #define LIGHTCONE_IDCHECK_ZONE 0.05
 #endif
@@ -40,6 +44,9 @@
 #define LIGHTCONE_B_OFFSET   2
 #define LIGHTCONE_HIJ_OFFSET 5
 #define LIGHTCONE_MAX_FIELDS 10
+#define LIGHTCONE_CDM_OFFSET 5
+#define LIGHTCONE_NCDM_OFFSET 6
+#define LIGHTCONE_RSD_OFFSET 7
 
 #ifndef MAX_PCL_SPECIES
 #define MAX_PCL_SPECIES 6
@@ -63,15 +70,7 @@
 #define MASK_XSPEC  2048
 #define MASK_DELTA  4096
 #define MASK_DBARE  8192
-#define MASK_PI_K    16384
-#define MASK_zeta    32768
-#define MASK_MULTI  65536
-#define MASK_VEL    131072
-#define MASK_T_KESS 262144
-#define MASK_Delta_KESS 524288
-#define MASK_PHI_PRIME 1048576
-#define MASK_DELTAKESS_DELTA 2097152
-
+#define MASK_MULTI  16384
 
 #define ICFLAG_CORRECT_DISPLACEMENT 1
 #define ICFLAG_KSPHERE              2
@@ -94,6 +93,10 @@
 
 #define VECTOR_PARABOLIC            0
 #define VECTOR_ELLIPTIC             1
+
+#ifndef GRADIENT_ORDER
+#define GRADIENT_ORDER              1
+#endif
 
 // Physical constants
 #define C_PLANCK_LAW      4.48147e-7    // omega_g / (T_cmb [K])^4
@@ -139,12 +142,12 @@
 #define COLORTEXT_YELLOW    "\033[33;1m"
 #define COLORTEXT_RESET     "\033[0m"
 #else
-#define COLORTEXT_WHITE     '\0'
-#define COLORTEXT_CYAN      '\0'
-#define COLORTEXT_GREEN     '\0'
-#define COLORTEXT_RED       '\0'
-#define COLORTEXT_YELLOW    '\0'
-#define COLORTEXT_RESET     '\0'
+#define COLORTEXT_WHITE     ""
+#define COLORTEXT_CYAN      ""
+#define COLORTEXT_GREEN     ""
+#define COLORTEXT_RED       ""
+#define COLORTEXT_YELLOW    ""
+#define COLORTEXT_RESET     ""
 #endif
 
 // header structure for GADGET-2 files [V. Springel, N. Yoshida, and S.D. White, New Astron. 6 (2001) 79
@@ -213,7 +216,7 @@ struct metadata
 	int gr_flag;
 	int vector_flag;
 	int radiation_flag;
-	int fluid_flag=0;
+	int fluid_flag;
 	int out_pk;
 	int out_snapshot;
 	int out_lightcone[MAX_OUTPUTS];
@@ -247,11 +250,6 @@ struct metadata
 	char output_path[PARAM_MAX_LENGTH];
 	char restart_path[PARAM_MAX_LENGTH];
 	char basename_restart[PARAM_MAX_LENGTH];
-	//Kessence part
-	int nKe_numsteps;
-	int Kess_source_gravity;
-  int NL_kessence;
-	//kessence end
 };
 
 struct icsettings
@@ -261,13 +259,9 @@ struct icsettings
 	int flags;
 	int generator;
 	int restart_cycle;
-  int IC_kess ; // Initial conditions for kessence fields (pi,zeta); 0 is from CLASS and 1 is provided by hand
 	char pclfile[MAX_PCL_SPECIES][PARAM_MAX_LENGTH];
 	char pkfile[PARAM_MAX_LENGTH];
 	char tkfile[PARAM_MAX_LENGTH];
-	//Kessence
-	char tk_kessence[PARAM_MAX_LENGTH];
-	//kessence end
 	char metricfile[3][PARAM_MAX_LENGTH];
 	double restart_tau;
 	double restart_dtau;
@@ -278,7 +272,6 @@ struct icsettings
 	double A_s;
 	double n_s;
 	double k_pivot;
-
 };
 
 struct cosmology
@@ -287,16 +280,10 @@ struct cosmology
 	double Omega_b;
 	double Omega_m;
 	double Omega_Lambda;
-	// Kessence part
-	double Omega_kessence;
-  double w_kessence;
-	double cs2_kessence;
-  // fld CLASS
-  // double Omega_fld=0.0;
-	// double w0_fld=0.0;
-	// double wa_fld=0.0;
-	// double cs2_fld=1.0;
-	//kessence end
+	double Omega_fld;
+	double w0_fld;
+	double wa_fld;
+	double cs2_fld;
 	double Omega_g;
 	double Omega_ur;
 	double Omega_rad;
@@ -306,6 +293,69 @@ struct cosmology
 	double T_ncdm[MAX_PCL_SPECIES-2];
 	double deg_ncdm[MAX_PCL_SPECIES-2];
 	int num_ncdm;
+};
+
+// Definition of the Quintessence cosmology structure
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_spline.h>
+
+struct mg_cosmology
+{
+	// Action parameters
+	double x_k;
+  double x_b;
+  double x_m;
+  double x_t;
+  double M_star_ini;
+  // Vector of background values to be filled with mg_import function
+  std::vector<double> a_vec;
+  std::vector<double> H_vec;
+	std::vector<double> H_prime_vec;
+	std::vector<double> omega_mg_vec;
+	std::vector<double> Omega_m_vec;
+	std::vector<double> Omega_rad_vec;
+	std::vector<double> Omega_mg_vec;
+  std::vector<double> mg_field_vec;
+  std::vector<double> mg_field_p_vec;
+  std::vector<double> particleHorizon_vec;
+
+  // Pointers to associated double * arrays to the above vectors (necessary as inputs of GSL interpolation)
+  double * a;
+  double * H;
+	double * H_prime;
+	double * w_mg;
+  double * c_s2;
+	double * Omega_m;
+	double * Omega_rad;
+	double * Omega_mg;
+  double * mg_field;
+  double * mg_field_p;
+  double * particleHorizon;
+
+  // Value of the size of the vectors
+  int last_int;
+
+  // Interpolation structures (allocated in main)
+  gsl_interp_accel * acc_H;
+  gsl_spline * spline_H;
+	gsl_interp_accel * acc_H_prime;
+  gsl_spline * spline_H_prime;
+	gsl_interp_accel * acc_omega_mg;
+  gsl_spline * spline_omega_mg;
+	gsl_interp_accel * acc_Omega_m;
+  gsl_spline * spline_Omega_m;
+	gsl_interp_accel * acc_Omega_rad;
+  gsl_spline * spline_Omega_rad;
+	gsl_interp_accel * acc_Omega_mg;
+  gsl_spline * spline_Omega_mg;
+  gsl_interp_accel * acc_mg_field;
+  gsl_spline * spline_mg_field;
+  gsl_interp_accel * acc_mg_field_p;
+  gsl_spline * spline_mg_field_p;
+  gsl_interp_accel * acc_particleHorizon;
+  gsl_spline * spline_particleHorizon;
+
+
 };
 
 #endif
