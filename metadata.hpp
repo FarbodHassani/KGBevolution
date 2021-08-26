@@ -1,12 +1,12 @@
 //////////////////////////
 // metadata.hpp
 //////////////////////////
-//
+// 
 // Constants and metadata structures
 //
-// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London & Universität Zürich)
+// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London)
 //
-// Last modified: January 2021
+// Last modified: April 2019
 //
 //////////////////////////
 
@@ -31,10 +31,6 @@
 #define MAX_INTERSECTS 12
 #endif
 
-#ifndef LIGHTCONE_THICKNESS
-#define LIGHTCONE_THICKNESS 1
-#endif
-
 #ifndef LIGHTCONE_IDCHECK_ZONE
 #define LIGHTCONE_IDCHECK_ZONE 0.05
 #endif
@@ -44,9 +40,6 @@
 #define LIGHTCONE_B_OFFSET   2
 #define LIGHTCONE_HIJ_OFFSET 5
 #define LIGHTCONE_MAX_FIELDS 10
-#define LIGHTCONE_CDM_OFFSET 5
-#define LIGHTCONE_NCDM_OFFSET 6
-#define LIGHTCONE_RSD_OFFSET 7
 
 #ifndef MAX_PCL_SPECIES
 #define MAX_PCL_SPECIES 6
@@ -71,6 +64,7 @@
 #define MASK_DELTA  4096
 #define MASK_DBARE  8192
 #define MASK_MULTI  16384
+#define MASK_VEL    32768
 
 #define ICFLAG_CORRECT_DISPLACEMENT 1
 #define ICFLAG_KSPHERE              2
@@ -93,10 +87,6 @@
 
 #define VECTOR_PARABOLIC            0
 #define VECTOR_ELLIPTIC             1
-
-#ifndef GRADIENT_ORDER
-#define GRADIENT_ORDER              1
-#endif
 
 // Physical constants
 #define C_PLANCK_LAW      4.48147e-7    // omega_g / (T_cmb [K])^4
@@ -293,69 +283,6 @@ struct cosmology
 	double T_ncdm[MAX_PCL_SPECIES-2];
 	double deg_ncdm[MAX_PCL_SPECIES-2];
 	int num_ncdm;
-};
-
-// Definition of the Quintessence cosmology structure
-#include <gsl/gsl_errno.h>
-#include <gsl/gsl_spline.h>
-
-struct mg_cosmology
-{
-	// Action parameters
-	double x_k;
-  double x_b;
-  double x_m;
-  double x_t;
-  double M_star_ini;
-  // Vector of background values to be filled with mg_import function
-  std::vector<double> a_vec;
-  std::vector<double> H_vec;
-	std::vector<double> H_prime_vec;
-	std::vector<double> omega_mg_vec;
-	std::vector<double> Omega_m_vec;
-	std::vector<double> Omega_rad_vec;
-	std::vector<double> Omega_mg_vec;
-  std::vector<double> mg_field_vec;
-  std::vector<double> mg_field_p_vec;
-  std::vector<double> particleHorizon_vec;
-
-  // Pointers to associated double * arrays to the above vectors (necessary as inputs of GSL interpolation)
-  double * a;
-  double * H;
-	double * H_prime;
-	double * w_mg;
-  double * c_s2;
-	double * Omega_m;
-	double * Omega_rad;
-	double * Omega_mg;
-  double * mg_field;
-  double * mg_field_p;
-  double * particleHorizon;
-
-  // Value of the size of the vectors
-  int last_int;
-
-  // Interpolation structures (allocated in main)
-  gsl_interp_accel * acc_H;
-  gsl_spline * spline_H;
-	gsl_interp_accel * acc_H_prime;
-  gsl_spline * spline_H_prime;
-	gsl_interp_accel * acc_omega_mg;
-  gsl_spline * spline_omega_mg;
-	gsl_interp_accel * acc_Omega_m;
-  gsl_spline * spline_Omega_m;
-	gsl_interp_accel * acc_Omega_rad;
-  gsl_spline * spline_Omega_rad;
-	gsl_interp_accel * acc_Omega_mg;
-  gsl_spline * spline_Omega_mg;
-  gsl_interp_accel * acc_mg_field;
-  gsl_spline * spline_mg_field;
-  gsl_interp_accel * acc_mg_field_p;
-  gsl_spline * spline_mg_field_p;
-  gsl_interp_accel * acc_particleHorizon;
-  gsl_spline * spline_particleHorizon;
-
-
 };
 
 #endif

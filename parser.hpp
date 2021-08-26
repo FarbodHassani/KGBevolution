@@ -4,9 +4,9 @@
 // 
 // Parser for settings file
 //
-// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London & Universität Zürich)
+// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London)
 //
-// Last modified: November 2020
+// Last modified: April 2019
 //
 //////////////////////////
 
@@ -663,7 +663,7 @@ bool parseFieldSpecifiers(parameter * & params, const int numparam, const char *
 					pvalue |= MASK_POT;
 				else if (strcmp(item, "B") == 0 || strcmp(item, "Bi") == 0)
 					pvalue |= MASK_B;
-				else if (strcmp(item, "P") == 0 || strcmp(item, "p") == 0 || strcmp(item, "v") == 0)
+				else if (strcmp(item, "P") == 0 || strcmp(item, "p") == 0)
 					pvalue |= MASK_P;
 				else if (strcmp(item, "T00") == 0 || strcmp(item, "rho") == 0)
 					pvalue |= MASK_T00;
@@ -685,6 +685,8 @@ bool parseFieldSpecifiers(parameter * & params, const int numparam, const char *
 					pvalue |= MASK_DELTA;
 				else if (strcmp(item, "delta_N") == 0 || strcmp(item, "deltaN") == 0)
 					pvalue |= MASK_DBARE;
+				else if (strcmp(item, "v") == 0 || strcmp(item, "velocity") == 0)
+					pvalue |= MASK_VEL;
 					
 				start = comma+1;
 				while (*start == ' ' || *start == '\t') start++;
@@ -698,7 +700,7 @@ bool parseFieldSpecifiers(parameter * & params, const int numparam, const char *
 				pvalue |= MASK_POT;
 			else if (strcmp(start, "B") == 0 || strcmp(start, "Bi") == 0)
 				pvalue |= MASK_B;
-			else if (strcmp(start, "P") == 0 || strcmp(start, "p") == 0 || strcmp(start, "v") == 0)
+			else if (strcmp(start, "P") == 0 || strcmp(start, "p") == 0)
 				pvalue |= MASK_P;
 			else if (strcmp(start, "T00") == 0 || strcmp(start, "rho") == 0)
 				pvalue |= MASK_T00;
@@ -720,6 +722,8 @@ bool parseFieldSpecifiers(parameter * & params, const int numparam, const char *
 				pvalue |= MASK_DELTA;
 			else if (strcmp(start, "delta_N") == 0 || strcmp(start, "deltaN") == 0)
 				pvalue |= MASK_DBARE;
+			else if (strcmp(start, "v") == 0 || strcmp(start, "velocity") == 0)
+					pvalue |= MASK_VEL;
 			
 			params[i].used = true;
 			return true;
@@ -997,11 +1001,6 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
 #endif
 		}
 #else
-		else if (par_string[0] == 'r' || par_string[0] == 'R')
-		{
-			sim.radiation_flag = 1;
-			COUT << " radiation treatment set to: " << COLORTEXT_CYAN << "read transfer functions from file" << COLORTEXT_RESET << endl;
-		}
 		else
 		{
 			sim.radiation_flag = 0;
@@ -1042,11 +1041,6 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
 #endif
 		}
 #else
-		else if (par_string[0] == 'r' || par_string[0] == 'R')
-		{
-			sim.fluid_flag = 1;
-			COUT << " fluid treatment set to: " << COLORTEXT_CYAN << "read transfer functions from file" << COLORTEXT_RESET << endl;
-		}
 		else
 		{
 			sim.fluid_flag = 0;
@@ -1784,7 +1778,7 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
 	}
 	else if (sim.gr_flag == 0 && sim.z_switch_linearchi <= 0.01)
 	{
-		COUT << COLORTEXT_YELLOW << " /!\\ warning" << COLORTEXT_RESET << ": with gravity theory = Newton the switch linear chi redshift must be larger than 0.01." << endl;
+		COUT << COLORTEXT_YELLOW << " /!\\ warning" << COLORTEXT_RESET << ": with garavity theory = Newton the switch linear chi redshift must be larger than 0.01." << endl;
 		COUT << "              setting switch linear chi = 0.011" << endl;
 		sim.z_switch_linearchi = 0.011;
 	}

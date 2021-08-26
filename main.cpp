@@ -26,16 +26,15 @@
 // 
 // main control sequence of Geneva N-body code with evolution of metric perturbations (gevolution)
 //
-// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London & Universität Zürich)
+// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London)
 //
-// Last modified: January 2021
+// Last modified: November 2019
 //
 //////////////////////////
 
 #include <stdlib.h>
 #include <set>
 #include <vector>
-#include <forward_list>
 #ifdef HAVE_CLASS
 #include "class.h"
 #undef MAX			// due to macro collision this has to be done BEFORE including LATfield2 headers!
@@ -60,19 +59,18 @@
 #include "parser.hpp"
 #include "output.hpp"
 #include "hibernation.hpp"
+#ifdef VELOCITY
+#include "velocity.hpp"
+#endif
 
 using namespace std;
-
 using namespace LATfield2;
 
 int main(int argc, char **argv)
 {
-	
 #ifdef BENCHMARK
 	//benchmarking variables
-	
 	double ref_time, ref2_time, cycle_start_time;
-	
 	double initialization_time;
 	double run_time;
 	double cycle_time=0;
@@ -86,19 +84,18 @@ int main(int argc, char **argv)
 	double update_q_time = 0;
 	int update_q_count = 0;
 	double moveParts_time = 0;
-	int  moveParts_count =0;
-	
+	int  moveParts_count =0;	
 #endif  //BENCHMARK
 	
 	int n = 0, m = 0;
 	int io_size = 0;
 	int io_group_size = 0;
 	
-	int i, j, cycle = 0, snapcount = 0, pkcount = 0, restartcount = 0, usedparams, numparam = 0, numsteps, numspecies, done_hij;
+	int i, j, cycle = 0, snapcount = 0, pkcount = 0, restartcount = 0, usedparams, numparam = 0, numspecies, done_hij;
 	int numsteps_ncdm[MAX_PCL_SPECIES-2];
 	long numpts3d;
 	int box[3];
-	double dtau, dtau_old, dtau_older, dx, tau, a, fourpiG, tau_Lambda, tmp, start_time;
+	double dtau, dtau_old, dx, tau, a, fourpiG, tmp, start_time;
 	double maxvel[MAX_PCL_SPECIES];
 	FILE * outfile;
 	char filename[2*PARAM_MAX_LENGTH+24];
@@ -154,6 +151,11 @@ int main(int argc, char **argv)
 #ifndef EXTERNAL_IO
 	parallel.initialize(n,m);
 #else
+	if (!io_size || !io_group_size)
+	{
+		cout << "invalid number of I/O tasks and group sizes for I/O server (-DEXTERNAL_IO)" << endl;
+		exit(-1000);
+	}
 	parallel.initialize(n,m,io_size,io_group_size);
 	if(parallel.isIO()) ioserver.start();
 	else
@@ -162,12 +164,8 @@ int main(int argc, char **argv)
 	
 	COUT << COLORTEXT_WHITE << endl;	
 	COUT << "  _   _      _         __ ,  _" << endl;
-	COUT << " (_| (-' \\/ (_) (_ (_| (  ( (_) /\\/	version 1.2 beta    running on " << n*m << " cores." << endl;
+	COUT << " (_| (-' \\/ (_) (_ (_| (  ( (_) /\\/	version 1.2         running on " << n*m << " cores." << endl;
 	COUT << "  -'" << endl << COLORTEXT_RESET << endl;
-	
-#if GRADIENT_ORDER > 1
-	COUT << " compiled with GRADIENT_ORDER=" << GRADIENT_ORDER << endl;
-#endif
 	
 	if (settingsfile == NULL)
 	{
@@ -208,7 +206,7 @@ int main(int argc, char **argv)
 	box[1] = sim.numpts;
 	box[2] = sim.numpts;
 	
-	Lattice lat(3,box,GRADIENT_ORDER);
+	Lattice lat(3,box,1);
 	Lattice latFT;
 	latFT.initializeRealFFT(lat,0);
 	
@@ -249,65 +247,13 @@ int main(int argc, char **argv)
 	BiFT_check.initialize(latFT,3);
 	PlanFFT<Cplx> plan_Bi_check(&Bi_check, &BiFT_check);
 #endif
-
-	Field<Real> * lcbuffer[LIGHTCONE_MAX_FIELDS*LIGHTCONE_THICKNESS];
-	Lattice * lclat[LIGHTCONE_MAX_FIELDS];
-#ifdef LIGHTCONE_DOWNGRADE
-	int dgbox[3];
-	
-	for (i = 0; i < 3; i++) dgbox[i] = box[i] / LIGHTCONE_DOWNGRADE;
-#endif
-
-#ifndef HAVE_HEALPIX
-	if (sim.num_lightcone > 0)
-	{
-		for (i = 0, j = 0; i < sim.num_lightcone; i++)
-		{
-			j |= sim.out_lightcone[i];
-		}
-
-		if (j & MASK_PHI)
-		{
-			lclat[LIGHTCONE_PHI_OFFSET] = new Lattice(3,box,0);
-			for (i = 0; i < LIGHTCONE_THICKNESS; i++)
-				lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_PHI_OFFSET+i] = new Field<Real>((*lclat[LIGHTCONE_PHI_OFFSET]), 1);
-		}
-
-		if (j & MASK_CHI)
-		{
-			lclat[LIGHTCONE_CHI_OFFSET] = new Lattice(3,box,0);
-			for (i = 0; i < LIGHTCONE_THICKNESS; i++)
-				lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_CHI_OFFSET+i] = new Field<Real>((*lclat[LIGHTCONE_CHI_OFFSET]), 1);
-		}
-
-		if (j & MASK_B)
-		{
-			lclat[LIGHTCONE_B_OFFSET] = new Lattice(3,box,0);
-			for (i = 0; i < 3*LIGHTCONE_THICKNESS; i++)
-				lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_B_OFFSET+i] = new Field<Real>((*lclat[LIGHTCONE_B_OFFSET]), 1);
-		}
-
-		if (j & MASK_HIJ)
-		{
-#ifdef LIGHTCONE_DOWNGRADE
-			lclat[LIGHTCONE_HIJ_OFFSET] = new Lattice(3,dgbox,0);
-#else
-			lclat[LIGHTCONE_HIJ_OFFSET] = new Lattice(3,box,0);
-#endif
-			for (i = 0; i < 5*LIGHTCONE_THICKNESS; i++)
-				lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+i] = new Field<Real>((*lclat[LIGHTCONE_HIJ_OFFSET]), 1);
-		}
-	}
-#else
-#ifdef UNITY_HACK
-	lclat[0] = &lat;
-	lclat[1] = &lat;
-	lcbuffer[0] = new Field<Real>;
-	lcbuffer[0]->initialize(lat,1);
-	PlanFFT<Cplx> plan_ncdm(lcbuffer[0], &scalarFT);
-	lcbuffer[1] = new Field<Real>(lat,1);
-	lcbuffer[2] = new Field<Real>(lat,1);
-#endif
+#ifdef VELOCITY
+	Field<Real> vi;
+	Field<Cplx> viFT;
+	vi.initialize(lat,3);
+	viFT.initialize(latFT,3);
+	PlanFFT<Cplx> plan_vi(&vi, &viFT);
+	double a_old;
 #endif
 
 	update_cdm_fields[0] = &phi;
@@ -338,7 +284,6 @@ int main(int argc, char **argv)
 	fourpiG = 1.5 * sim.boxsize * sim.boxsize / C_SPEED_OF_LIGHT / C_SPEED_OF_LIGHT;
 	a = 1. / (1. + sim.z_in);
 	tau = particleHorizon(a, fourpiG, cosmo);
-	tau_Lambda = -1.0;
 	
 	if (sim.Cf * dx < sim.steplimit / Hconf(a, fourpiG, cosmo))
 		dtau = sim.Cf * dx;
@@ -346,7 +291,6 @@ int main(int argc, char **argv)
 		dtau = sim.steplimit / Hconf(a, fourpiG, cosmo);
 		
 	dtau_old = 0.;
-	dtau_older = 0.;
 	
 	if (ic.generator == ICGEN_BASIC)
 		generateIC_basic(sim, ic, cosmo, fourpiG, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, params, numparam); // generates ICs on the fly
@@ -392,6 +336,10 @@ int main(int argc, char **argv)
 		}
 	}
 #endif
+#ifdef VELOCITY
+	a_old = a;
+	projection_init(&vi);
+#endif
 	
 #ifdef BENCHMARK
 	initialization_time = MPI_Wtime() - start_time;
@@ -402,15 +350,9 @@ int main(int argc, char **argv)
 #endif
 
 #ifdef HAVE_CLASS
-#ifdef COSIRA_HACK
-	initializeCLASSstructures(sim, ic, cosmo, class_background, class_perturbs, class_spectra, params, numparam);
-#endif // COSIRA_HACK
 	if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
 	{
-#ifndef COSIRA_HACK
 		initializeCLASSstructures(sim, ic, cosmo, class_background, class_thermo, class_perturbs, params, numparam);
-#endif // COSIRA_HACK
-#ifndef MULTISTEP_PROJECTION
 		if (sim.gr_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.) && (ic.generator == ICGEN_BASIC || (ic.generator == ICGEN_READ_FROM_DISK && cycle == 0)))
 		{
 			prepareFTchiLinear(class_background, class_perturbs, scalarFT, sim, ic, cosmo, fourpiG, a);
@@ -419,19 +361,8 @@ int main(int argc, char **argv)
 				chi(x) += source(x);
 			chi.updateHalo();
 		}
-#endif
 	}
 	if (numparam > 0) free(params);
-#else
-	if ((sim.radiation_flag > 0 || sim.fluid_flag > 0) && sim.gr_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.) && (ic.generator == ICGEN_BASIC || (ic.generator == ICGEN_READ_FROM_DISK && cycle == 0)))
-	{
-		sprintf(filename, "%s%s_z%d_tk.dat", sim.output_path, sim.basename_generic, cycle);
-		prepareFTchiLinear(filename, scalarFT, sim, ic, cosmo, fourpiG, a);
-		plan_source.execute(FFT_BACKWARD);
-		for (x.first(); x.test(); x.next())
-			chi(x) += source(x);
-		chi.updateHalo();
-	}
 #endif
 
 	while (true)    // main loop
@@ -440,32 +371,16 @@ int main(int argc, char **argv)
 		cycle_start_time = MPI_Wtime();
 #endif
 		// construct stress-energy tensor
-#ifndef MULTISTEP_PROJECTION	// multistep projection: projection_init is called at the beginning of the particle update
 		projection_init(&source);
-		
-		if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
 #ifdef HAVE_CLASS
-#ifndef UNITY_HACK
+		if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
 			projection_T00_project(class_background, class_perturbs, source, scalarFT, &plan_source, sim, ic, cosmo, fourpiG, a);
-#else
-#ifndef HAVE_HEALPIX
-#error UNITY_HACK requires HAVE_HEALPIX!
-#endif
-			projection_T00_project(class_background, class_perturbs, *lcbuffer[0], scalarFT, &plan_ncdm, sim, ic, cosmo, fourpiG, a);
-#endif
-#else
-		{
-			sprintf(filename, "%s%s_z%d_tk.dat", sim.output_path, sim.basename_generic, cycle);
-			projection_T00_project(filename, source, scalarFT, &plan_source, sim, ic, cosmo, fourpiG, a);
-		}
-#endif
 #endif
 		if (sim.gr_flag > 0)
 		{
 			projection_T00_project(&pcls_cdm, &source, a, &phi);
 			if (sim.baryon_flag)
 				projection_T00_project(&pcls_b, &source, a, &phi);
-#ifndef MULTISTEP_PROJECTION	// multistep projection: non-cold species are projected at each of their update steps
 			for (i = 0; i < cosmo.num_ncdm; i++)
 			{
 				if (a >= 1. / (sim.z_switch_deltancdm[i] + 1.) && sim.numpcl[1+sim.baryon_flag+i] > 0)
@@ -474,48 +389,34 @@ int main(int argc, char **argv)
 				{
 					tmp = bg_ncdm(a, cosmo, i);
 					for(x.first(); x.test(); x.next())
-#ifdef UNITY_HACK
-						(*lcbuffer[0])(x) += tmp;
-#else
 						source(x) += tmp;
-#endif
 				}
 			}
-#endif
 		}
 		else
 		{
 			scalarProjectionCIC_project(&pcls_cdm, &source);
 			if (sim.baryon_flag)
 				scalarProjectionCIC_project(&pcls_b, &source);
-#ifndef MULTISTEP_PROJECTION	// multistep projection: non-cold species are projected at each of their update steps
 			for (i = 0; i < cosmo.num_ncdm; i++)
 			{
 				if (a >= 1. / (sim.z_switch_deltancdm[i] + 1.) && sim.numpcl[1+sim.baryon_flag+i] > 0)
 					scalarProjectionCIC_project(pcls_ncdm+i, &source);
 			}
-#endif
 		}
 		projection_T00_comm(&source);
 		
-#ifdef UNITY_HACK
-		for (x.first(); x.test(); x.next())
+#ifdef VELOCITY
+		if ((sim.out_pk & MASK_VEL) || (sim.out_snapshot & MASK_VEL))
 		{
-			(*lcbuffer[1])(x) = source(x);
-			source(x) += (*lcbuffer[0])(x);
+			projection_init(&Bi);
+            projection_Ti0_project(&pcls_cdm, &Bi, &phi, &chi);
+            vertexProjectionCIC_comm(&Bi);
+            compute_vi_rescaled(cosmo, &vi, &source, &Bi, a, a_old);
+            a_old = a;
 		}
-		
-		projection_init(lcbuffer[2]);
-		if (sim.num_lightcone > 0 && sim.lightcone[sim.num_lightcone-1].distance[0] + 0.5 * sim.covering[sim.num_lightcone-1] * dtau_old + 2. * dx > particleHorizon(1, fourpiG, cosmo) - tau)
-			projection_RSD_project(&pcls_cdm, lcbuffer[2], a, sim.lightcone[sim.num_lightcone-1], particleHorizon(1, fourpiG, cosmo) - tau - 0.5 * sim.covering[sim.num_lightcone-1] * dtau - 2. * dx, particleHorizon(1, fourpiG, cosmo) - tau + 0.5 * sim.covering[sim.num_lightcone-1] * dtau_old + 2. * dx);
-		projection_T00_comm(lcbuffer[2]);
-		
-		lcbuffer[0]->updateHalo();
-		lcbuffer[1]->updateHalo();
-		lcbuffer[2]->updateHalo();
 #endif
 
-#ifndef VECTOREXTRA
 		if (sim.vector_flag == VECTOR_ELLIPTIC)
 		{
 			projection_init(&Bi);
@@ -529,7 +430,6 @@ int main(int argc, char **argv)
 			}
 			projection_T0i_comm(&Bi);
 		}
-#endif
 		
 		projection_init(&Sij);
 		projection_Tij_project(&pcls_cdm, &Sij, a, &phi);
@@ -643,18 +543,15 @@ int main(int argc, char **argv)
 		fft_count += 6;
 #endif
 
+#ifdef HAVE_CLASS
 		if (sim.radiation_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.))
 		{
-#ifdef HAVE_CLASS
 			prepareFTchiLinear(class_background, class_perturbs, scalarFT, sim, ic, cosmo, fourpiG, a);
-#else
-			sprintf(filename, "%s%s_z%d_tk.dat", sim.output_path, sim.basename_generic, cycle);
-			prepareFTchiLinear(filename, scalarFT, sim, ic, cosmo, fourpiG, a);
-#endif
 			projectFTscalar(SijFT, scalarFT, 1);
 		}
-		else	
-			projectFTscalar(SijFT, scalarFT);  // construct chi by scalar projection (k-space)
+		else
+#endif		
+		projectFTscalar(SijFT, scalarFT);  // construct chi by scalar projection (k-space)
 
 #ifdef BENCHMARK
 		ref2_time= MPI_Wtime();
@@ -668,25 +565,6 @@ int main(int argc, char **argv)
 
 		if (sim.vector_flag == VECTOR_ELLIPTIC)
 		{
-#ifdef VECTOREXTRA
-			prepareFTvector(phi, Bi, Sij, 0.5 / (fourpiG * dx * dx));
-			projection_init(&Bi);
-			projection_T0i_project(&pcls_cdm, &Bi, &phi);
-			if (sim.baryon_flag)
-				projection_T0i_project(&pcls_b, &Bi, &phi);
-			for (i = 0; i < cosmo.num_ncdm; i++)
-			{
-				if (a >= 1. / (sim.z_switch_Bncdm[i] + 1.) && sim.numpcl[1+sim.baryon_flag+i] > 0)
-					projection_T0i_project(pcls_ncdm+i, &Bi, &phi);
-			}
-			projection_T0i_comm(&Bi);
-			for (x.first(); x.test(); x.next())
-			{
-				Bi(x, 0) += Sij(x, 0);
-				Bi(x, 1) += Sij(x, 1);
-				Bi(x, 2) += Sij(x, 2);
-			}
-#endif
 #ifdef BENCHMARK
 			ref2_time= MPI_Wtime();
 #endif
@@ -723,7 +601,7 @@ int main(int argc, char **argv)
 
 		// lightcone output
 		if (sim.num_lightcone > 0)
-			writeLightcones(sim, cosmo, fourpiG, a, tau, dtau, dtau_old, dtau_older, maxvel[0], cycle, h5filename + sim.basename_lightcone, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &Sij, &BiFT, &SijFT, &plan_Bi, &plan_Sij, lcbuffer, lclat, done_hij, IDbacklog);
+			writeLightcones(sim, cosmo, fourpiG, a, tau, dtau, dtau_old, maxvel[0], cycle, h5filename + sim.basename_lightcone, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &Sij, &BiFT, &SijFT, &plan_Bi, &plan_Sij, done_hij, IDbacklog);
 		else done_hij = 0;
 
 #ifdef BENCHMARK
@@ -736,11 +614,14 @@ int main(int argc, char **argv)
 		{
 			COUT << COLORTEXT_CYAN << " writing snapshot" << COLORTEXT_RESET << " at z = " << ((1./a) - 1.) <<  " (cycle " << cycle << "), tau/boxsize = " << tau << endl;
 
+			writeSnapshots(sim, cosmo, fourpiG, a, dtau_old, done_hij, snapcount, h5filename + sim.basename_snapshot, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
 #ifdef CHECK_B
-			writeSnapshots(sim, cosmo, fourpiG, a, dtau_old, done_hij, snapcount, h5filename + sim.basename_snapshot, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, &Bi_check, &BiFT_check, &plan_Bi_check);
-#else
-			writeSnapshots(sim, cosmo, fourpiG, a, dtau_old, done_hij, snapcount, h5filename + sim.basename_snapshot, &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij);
+				, &Bi_check, &BiFT_check, &plan_Bi_check
 #endif
+#ifdef VELOCITY
+				, &vi
+#endif
+			);
 
 			snapcount++;
 		}
@@ -753,152 +634,18 @@ int main(int argc, char **argv)
 		// power spectra
 		if (pkcount < sim.num_pk && 1. / a < sim.z_pk[pkcount] + 1.)
 		{
-#ifdef COSIRA_HACK
-			if (sim.gr_flag > 0)
-			{
-				COUT << COLORTEXT_CYAN << " writing power spectra" << COLORTEXT_RESET << " at z = " << ((1./a) - 1.) <<  " (cycle " << cycle << "), tau/boxsize = " << tau << endl;
-			
-				writeSpectra(sim, ic, cosmo, fourpiG, a, pkcount,
-#ifdef HAVE_CLASS
-					class_background, class_perturbs,
-#else
-					cycle,
-#endif
-					&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
-#ifdef CHECK_B
-					, &Bi_check, &BiFT_check, &plan_Bi_check
-#endif
-				);
-
-				pkcount++;
-
-				COUT << " COSIRA hack: computing gauge transformation..." << endl;
-
-				long tmp2;
-				float * pcldata = NULL;
-				gsl_spline * tk_d1 = NULL;
-				gsl_spline * tk_d2 = NULL;
-				gsl_spline * tk_t1 = NULL;
-				gsl_spline * tk_t2 = NULL;
-				double * temp1 = NULL;
-				Field<Real> * psource = &source;
-
-				loadTransferFunctions(class_background, class_perturbs, tk_d1, tk_t1, "tot", sim.boxsize, (1. / a) - 1., cosmo.h);
-				loadTransferFunctions(class_background, class_perturbs, tk_d2, tk_t2, NULL, sim.boxsize, (1. / a) - 1., cosmo.h);
-
-				temp1 = (double *) malloc(tk_d1->size * sizeof(double));
-
-				for (i = 0; i < tk_d2->size; i++)
-					temp1[i] = -tk_d2->y[i] * M_PI * sqrt(Pk_primordial(tk_d2->x[i] * cosmo.h / sim.boxsize, ic) / tk_d2->x[i]) / tk_d2->x[i];
-				gsl_spline_free(tk_t2);
-				tk_t2 = gsl_spline_alloc(gsl_interp_cspline, tk_d2->size);
-				gsl_spline_init(tk_t2, tk_d2->x, temp1, tk_d2->size);
-				gsl_spline_free(tk_d2);
-
-				tmp = 3. * Hconf(a, fourpiG, cosmo)  * M_PI;
-
-				for (i = 0; i < tk_d1->size; i++)
-					temp1[i] = 3. * tk_t2->y[i] - tmp * tk_t1->y[i] * sqrt(Pk_primordial(tk_d1->x[i] * cosmo.h / sim.boxsize, ic) / tk_d1->x[i]) / tk_d1->x[i] / tk_d1->x[i] / tk_d1->x[i];
-
-				gsl_spline_free(tk_d1);
-				gsl_spline_free(tk_t1);
-				tk_d1 = gsl_spline_alloc(gsl_interp_cspline, tk_t2->size);
-				gsl_spline_init(tk_d1, tk_t2->x, temp1, tk_t2->size);
-				gsl_spline_free(tk_t2);
-				free(temp1);
-
-				if (ic.flags & ICFLAG_CORRECT_DISPLACEMENT)
-				{
-					loadHomogeneousTemplate(ic.pclfile[0], tmp2, pcldata);
-					generateCICKernel(source, tmp2, pcldata, ic.numtile[0]);
-					free(pcldata);
-				}
-				else
-					generateCICKernel(source);
-				plan_source.execute(FFT_FORWARD);
-				generateDisplacementField(scalarFT, 0., tk_d1, (unsigned int) ic.seed, ic.flags & ICFLAG_KSPHERE);
-				gsl_spline_free(tk_d1);
-				plan_source.execute(FFT_BACKWARD);
-				source.updateHalo();
-
-				source.saveHDF5(h5filename + "_displacement.h5");
-	
-				i = MAX;
-				pcls_cdm.moveParticles(displace_pcls_ic_basic, 1., &psource, 1, NULL, &tmp, &i, 1);
-				COUT << " Poisson gauge -> N-body gauge, cdm particles maximum displacement = " << tmp * sim.numpts << " lattice units." << endl;
-				sim.gr_flag = 0;
-			}
-#endif // COSIRA_HACK	
-#ifdef NMGAUGE_HACK
-			if (sim.gr_flag == 0)
-			{
-				COUT << COLORTEXT_CYAN << " writing power spectra" << COLORTEXT_RESET << " at z = " << ((1./a) - 1.) <<  " (cycle " << cycle << "), tau/boxsize = " << tau << endl;
-
-				writeSpectra(sim, ic, cosmo, fourpiG, a, pkcount,
-#ifdef HAVE_CLASS
-					class_background, class_perturbs,
-#else
-					cycle,
-#endif
-					&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
-#ifdef CHECK_B
-					, &Bi_check, &BiFT_check, &plan_Bi_check
-#endif
-				);
-
-				pkcount++;
-
-				COUT << " Nm-gauge hack: computing gauge transformation..." << endl;
-
-				long tmp2;
-				float * pcldata = NULL;
-				gsl_spline * tk_d1 = NULL;
-				gsl_spline * tk_t1 = NULL;
-				double * temp1 = NULL;
-				Field<Real> * psource = &source;
-
-				loadTransferFunctions("gaugetrafo.dat", tk_d1, tk_t1, "L", sim.boxsize, cosmo.h);
-
-				temp1 = (double *) malloc(tk_d1->size * sizeof(double));
-
-				for (i = 0; i < tk_d1->size; i++)
-					temp1[i] = tk_d1->y[i] * M_PI * sqrt(Pk_primordial(tk_d1->x[i] * cosmo.h / sim.boxsize, ic) / tk_d1->x[i]) * cosmo.h / sim.boxsize;
-				gsl_spline_free(tk_t1);
-				tk_t1 = gsl_spline_alloc(gsl_interp_cspline, tk_d1->size);
-				gsl_spline_init(tk_t1, tk_d1->x, temp1, tk_d1->size);
-				gsl_spline_free(tk_d1);
-				free(temp1);
-
-				if (ic.flags & ICFLAG_CORRECT_DISPLACEMENT)
-				{
-					loadHomogeneousTemplate(ic.pclfile[0], tmp2, pcldata);
-					generateCICKernel(source, tmp2, pcldata, ic.numtile[0]);
-					free(pcldata);
-				}
-				else
-					generateCICKernel(source);
-				plan_source.execute(FFT_FORWARD);
-				generateDisplacementField(scalarFT, 0., tk_t1, (unsigned int) ic.seed, ic.flags & ICFLAG_KSPHERE);
-				gsl_spline_free(tk_t1);
-				plan_source.execute(FFT_BACKWARD);
-				source.updateHalo();
-	
-				i = MAX;
-				pcls_cdm.moveParticles(displace_pcls_ic_basic, 1., &psource, 1, NULL, &tmp, &i, 1);
-				COUT << " Newtonian motion gauge -> N-body gauge, cdm particles maximum displacement = " << tmp * sim.numpts << " lattice units." << endl;
-			}
-#endif // NMGAUGE_HACK
 			COUT << COLORTEXT_CYAN << " writing power spectra" << COLORTEXT_RESET << " at z = " << ((1./a) - 1.) <<  " (cycle " << cycle << "), tau/boxsize = " << tau << endl;
 
-			writeSpectra(sim, ic, cosmo, fourpiG, a, pkcount,
+			writeSpectra(sim, cosmo, fourpiG, a, pkcount,
 #ifdef HAVE_CLASS
-				class_background, class_perturbs,
-#else
-				cycle,
+				class_background, class_perturbs, ic,
 #endif
 				&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
 #ifdef CHECK_B
 				, &Bi_check, &BiFT_check, &plan_Bi_check
+#endif
+#ifdef VELOCITY
+				, &vi, &viFT, &plan_vi
 #endif
 			);
 
@@ -912,15 +659,16 @@ int main(int argc, char **argv)
 
 		if (pkcount < sim.num_pk && 1. / tmp < sim.z_pk[pkcount] + 1.)
 		{
-			writeSpectra(sim, ic, cosmo, fourpiG, a, pkcount,
+			writeSpectra(sim, cosmo, fourpiG, a, pkcount,
 #ifdef HAVE_CLASS
-					class_background, class_perturbs,
-#else
-					cycle,
+				class_background, class_perturbs, ic,
 #endif
-					&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
+				&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
 #ifdef CHECK_B
-					, &Bi_check, &BiFT_check, &plan_Bi_check
+				, &Bi_check, &BiFT_check, &plan_Bi_check
+#endif
+#ifdef VELOCITY
+				, &vi, &viFT, &plan_vi
 #endif
 			);
 		}
@@ -940,22 +688,12 @@ int main(int argc, char **argv)
 			if (i == sim.num_lightcone) break; // simulation complete
 		}
 		
-		// compute number of step subdivisions for particle updates
-		numsteps = 1;
+		// compute number of step subdivisions for ncdm particle updates
 		for (i = 0; i < cosmo.num_ncdm; i++)
 		{
 			if (dtau * maxvel[i+1+sim.baryon_flag] > dx * sim.movelimit)
 				numsteps_ncdm[i] = (int) ceil(dtau * maxvel[i+1+sim.baryon_flag] / dx / sim.movelimit);
 			else numsteps_ncdm[i] = 1;
-			
-			if (numsteps < numsteps_ncdm[i]) numsteps = numsteps_ncdm[i];
-		}
-		if (numsteps > 1 && numsteps % 2 > 0) numsteps++;   // if >1, make it an even number
-		
-		for (i = 0; i < cosmo.num_ncdm; i++)
-		{
-			if (numsteps / numsteps_ncdm[i] <= 1) numsteps_ncdm[i] = numsteps;
-			else if (numsteps_ncdm[i] > 1) numsteps_ncdm[i] = numsteps / 2;
 		}
 		
 		if (cycle % CYCLE_INFO_INTERVAL == 0)
@@ -984,180 +722,92 @@ int main(int argc, char **argv)
 			COUT << endl;
 		}
 
-#ifdef MULTISTEP_PROJECTION		// multistep projection: non-cold species are projected at each of their update steps
-		projection_init(&source);
-#ifdef HAVE_CLASS
-		if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
-		{
-			tmp = a;
-			for (j = 0; j < 2 * numsteps; j++)
-				rungekutta4bg(tmp, fourpiG, cosmo, 0.5 * dtau / numsteps);
-			projection_T00_project(class_background, class_perturbs, source, scalarFT, &plan_source, sim, ic, cosmo, fourpiG, tmp);
-		}
-#endif
-#endif
-		for (j = 0; j < numsteps; j++) // particle update
-		{
 #ifdef BENCHMARK
-			ref2_time = MPI_Wtime();
+		ref2_time = MPI_Wtime();
 #endif
-			f_params[0] = a;
-			f_params[1] = a * a * sim.numpts;
-			if (j == 0)
+		for (i = 0; i < cosmo.num_ncdm; i++) // non-cold DM particle update
+		{
+			if (sim.numpcl[1+sim.baryon_flag+i] == 0) continue;
+			
+			tmp = a;
+			
+			for (j = 0; j < numsteps_ncdm[i]; j++)
 			{
+				f_params[0] = tmp;
+				f_params[1] = tmp * tmp * sim.numpts;
 				if (sim.gr_flag > 0)
-				{
-					maxvel[0] = pcls_cdm.updateVel(update_q, (dtau + dtau_old) / 2., update_cdm_fields, (1. / a < ic.z_relax + 1. ? 3 : 2), f_params);
-					if (sim.baryon_flag)
-						maxvel[1] = pcls_b.updateVel(update_q, (dtau + dtau_old) / 2., update_b_fields, (1. / a < ic.z_relax + 1. ? 3 : 2), f_params);
-				}
+					maxvel[i+1+sim.baryon_flag] = pcls_ncdm[i].updateVel(update_q, (dtau + dtau_old) / 2. / numsteps_ncdm[i], update_ncdm_fields, (1. / a < ic.z_relax + 1. ? 3 : 2), f_params);
 				else
-				{
-					maxvel[0] = pcls_cdm.updateVel(update_q_Newton, (dtau + dtau_old) / 2., update_cdm_fields, ((sim.radiation_flag + sim.fluid_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.)) ? 2 : 1), f_params);
-					if (sim.baryon_flag)
-						maxvel[1] = pcls_b.updateVel(update_q_Newton, (dtau + dtau_old) / 2., update_b_fields, ((sim.radiation_flag + sim.fluid_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.)) ? 2 : 1), f_params);
-				}
+					maxvel[i+1+sim.baryon_flag] = pcls_ncdm[i].updateVel(update_q_Newton, (dtau + dtau_old) / 2. / numsteps_ncdm[i], update_ncdm_fields, ((sim.radiation_flag + sim.fluid_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.)) ? 2 : 1), f_params);
 
 #ifdef BENCHMARK
 				update_q_count++;
+				update_q_time += MPI_Wtime() - ref2_time;
+				ref2_time = MPI_Wtime();
 #endif
-			}
+
+				rungekutta4bg(tmp, fourpiG, cosmo, 0.5 * dtau / numsteps_ncdm[i]);
+				f_params[0] = tmp;
+				f_params[1] = tmp * tmp * sim.numpts;
 				
-			for (i = 0; i < cosmo.num_ncdm; i++)
-			{
-				if (sim.numpcl[1+sim.baryon_flag+i] == 0) continue;
-
-				if (j % (numsteps / numsteps_ncdm[i]) == 0)
-				{
-					if (sim.gr_flag > 0)
-						maxvel[i+1+sim.baryon_flag] = pcls_ncdm[i].updateVel(update_q, (dtau + dtau_old) / 2. / numsteps_ncdm[i], update_ncdm_fields, (1. / a < ic.z_relax + 1. ? 3 : 2), f_params);
-					else
-						maxvel[i+1+sim.baryon_flag] = pcls_ncdm[i].updateVel(update_q_Newton, (dtau + dtau_old) / 2. / numsteps_ncdm[i], update_ncdm_fields, ((sim.radiation_flag + sim.fluid_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.)) ? 2 : 1), f_params);
-
-#ifdef BENCHMARK
-					update_q_count++;
-#endif
-				}
-			}
-#ifdef BENCHMARK
-			update_q_time += MPI_Wtime() - ref2_time;
-			ref2_time = MPI_Wtime();
-#endif
-		
-			for (i = 0; i < cosmo.num_ncdm; i++)
-			{
-				if (sim.numpcl[1+sim.baryon_flag+i] == 0) continue;
-
-				if (numsteps > 1 && ((numsteps_ncdm[i] == 1 && j == numsteps / 2) || (numsteps_ncdm[i] == numsteps / 2 && j % 2 > 0)))
-				{
-					if (sim.gr_flag > 0)
-						pcls_ncdm[i].moveParticles(update_pos, dtau / numsteps_ncdm[i], update_ncdm_fields, (1. / a < ic.z_relax + 1. ? 3 : 2), f_params);
-					else
-						pcls_ncdm[i].moveParticles(update_pos_Newton, dtau / numsteps_ncdm[i], NULL, 0, f_params);
-#ifdef BENCHMARK
-						moveParts_count++;
-						moveParts_time += MPI_Wtime() - ref2_time;
-						ref2_time = MPI_Wtime();
-#endif
-#ifdef MULTISTEP_PROJECTION		// multistep projection: non-cold species are projected at each of their update steps
-					if (sim.radiation_flag == 0 || a >= 1. / (sim.z_switch_deltancdm[i] + 1.))
-					{
-						if (sim.gr_flag > 0)
-						{
-							tmp = a;
-							rungekutta4bg(tmp, fourpiG, cosmo, 0.5 * dtau / numsteps);
-							projection_T00_project(pcls_ncdm+i, &source, tmp, &phi, 1. / (double) numsteps_ncdm[i]);
-						}
-						else
-						{
-							tmp = pcls_ncdm[i].parts_info()->mass;
-							pcls_ncdm[i].parts_info()->mass /= (double) numsteps_ncdm[i];
-							scalarProjectionCIC_project(pcls_ncdm+i, &source);
-							pcls_ncdm[i].parts_info()->mass = tmp;
-						}
-					}
-#ifdef BENCHMARK
-						projection_time += MPI_Wtime() - ref2_time;
-						ref2_time = MPI_Wtime();
-#endif
-#endif
-				}	  
-			}
-
-			if (numsteps == 1)
-				rungekutta4bg(a, fourpiG, cosmo, 0.5 * dtau / numsteps);  // evolve background by half a time step
-
-			f_params[0] = a;
-			f_params[1] = a * a * sim.numpts;
-			if (numsteps == 1 || j == numsteps / 2)
-			{
 				if (sim.gr_flag > 0)
-				{
-					pcls_cdm.moveParticles(update_pos, dtau, update_cdm_fields, (1. / a < ic.z_relax + 1. ? 3 : 0), f_params);
-					if (sim.baryon_flag)
-						pcls_b.moveParticles(update_pos, dtau, update_b_fields, (1. / a < ic.z_relax + 1. ? 3 : 0), f_params);
-				}
+					pcls_ncdm[i].moveParticles(update_pos, dtau / numsteps_ncdm[i], update_ncdm_fields, (1. / a < ic.z_relax + 1. ? 3 : 2), f_params);
 				else
-				{
-					pcls_cdm.moveParticles(update_pos_Newton, dtau, NULL, 0, f_params);
-					if (sim.baryon_flag)
-						pcls_b.moveParticles(update_pos_Newton, dtau, NULL, 0, f_params);
-				}
-
+					pcls_ncdm[i].moveParticles(update_pos_Newton, dtau / numsteps_ncdm[i], NULL, 0, f_params);
 #ifdef BENCHMARK
 				moveParts_count++;
 				moveParts_time += MPI_Wtime() - ref2_time;
 				ref2_time = MPI_Wtime();
 #endif
+				rungekutta4bg(tmp, fourpiG, cosmo, 0.5 * dtau / numsteps_ncdm[i]);
 			}
+		}
 
-			if (numsteps != 1)
-				rungekutta4bg(a, fourpiG, cosmo, 0.5 * dtau / numsteps);  // evolve background by half a time step
-			
-			f_params[0] = a;
-			f_params[1] = a * a * sim.numpts;	
-			for (i = 0; i < cosmo.num_ncdm; i++)
-			{
-				if (sim.numpcl[1+sim.baryon_flag+i] == 0) continue;
+		// cdm and baryon particle update
+		f_params[0] = a;
+		f_params[1] = a * a * sim.numpts;
+		if (sim.gr_flag > 0)
+		{
+			maxvel[0] = pcls_cdm.updateVel(update_q, (dtau + dtau_old) / 2., update_cdm_fields, (1. / a < ic.z_relax + 1. ? 3 : 2), f_params);
+			if (sim.baryon_flag)
+				maxvel[1] = pcls_b.updateVel(update_q, (dtau + dtau_old) / 2., update_b_fields, (1. / a < ic.z_relax + 1. ? 3 : 2), f_params);
+		}
+		else
+		{
+			maxvel[0] = pcls_cdm.updateVel(update_q_Newton, (dtau + dtau_old) / 2., update_cdm_fields, ((sim.radiation_flag + sim.fluid_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.)) ? 2 : 1), f_params);
+			if (sim.baryon_flag)
+				maxvel[1] = pcls_b.updateVel(update_q_Newton, (dtau + dtau_old) / 2., update_b_fields, ((sim.radiation_flag + sim.fluid_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.)) ? 2 : 1), f_params);
+		}
 
-				if (numsteps_ncdm[i] == numsteps)
-				{
-					if (sim.gr_flag > 0)
-						pcls_ncdm[i].moveParticles(update_pos, dtau / numsteps_ncdm[i], update_ncdm_fields, (1. / a < ic.z_relax + 1. ? 3 : 2), f_params);
-					else
-						pcls_ncdm[i].moveParticles(update_pos_Newton, dtau / numsteps_ncdm[i], NULL, 0, f_params);
 #ifdef BENCHMARK
-						moveParts_count++;
-						moveParts_time += MPI_Wtime() - ref2_time;
-						ref2_time = MPI_Wtime();
+		update_q_count++;
+		update_q_time += MPI_Wtime() - ref2_time;
+		ref2_time = MPI_Wtime();
 #endif
-#ifdef MULTISTEP_PROJECTION		// multistep projection: non-cold species are projected at each of their update steps
-					if (sim.radiation_flag == 0 || a >= 1. / (sim.z_switch_deltancdm[i] + 1.))
-					{
-						if (sim.gr_flag > 0)
-						{
-							tmp = a;
-							rungekutta4bg(tmp, fourpiG, cosmo, 0.5 * dtau / numsteps);
-							projection_T00_project(pcls_ncdm+i, &source, tmp, &phi, 1. / (double) numsteps_ncdm[i]);
-						}
-						else
-						{
-							tmp = pcls_ncdm[i].parts_info()->mass;
-							pcls_ncdm[i].parts_info()->mass /= (double) numsteps_ncdm[i];
-							scalarProjectionCIC_project(pcls_ncdm+i, &source);
-							pcls_ncdm[i].parts_info()->mass = tmp;
-						}
-					}
-#ifdef BENCHMARK
-						projection_time += MPI_Wtime() - ref2_time;
-						ref2_time = MPI_Wtime();
-#endif
-#endif
-				}
-			}
+				
+		rungekutta4bg(a, fourpiG, cosmo, 0.5 * dtau);  // evolve background by half a time step
 
-			rungekutta4bg(a, fourpiG, cosmo, 0.5 * dtau / numsteps);  // evolve background by half a time step
-		}   // particle update done
+		f_params[0] = a;
+		f_params[1] = a * a * sim.numpts;
+		if (sim.gr_flag > 0)
+		{
+			pcls_cdm.moveParticles(update_pos, dtau, update_cdm_fields, (1. / a < ic.z_relax + 1. ? 3 : 0), f_params);
+			if (sim.baryon_flag)
+				pcls_b.moveParticles(update_pos, dtau, update_b_fields, (1. / a < ic.z_relax + 1. ? 3 : 0), f_params);
+		}
+		else
+		{
+			pcls_cdm.moveParticles(update_pos_Newton, dtau, NULL, 0, f_params);
+			if (sim.baryon_flag)
+				pcls_b.moveParticles(update_pos_Newton, dtau, NULL, 0, f_params);
+		}
+
+#ifdef BENCHMARK
+		moveParts_count++;
+		moveParts_time += MPI_Wtime() - ref2_time;
+#endif
+
+		rungekutta4bg(a, fourpiG, cosmo, 0.5 * dtau);  // evolve background by half a time step
 		
 		parallel.max<double>(maxvel, numspecies);
 		
@@ -1166,14 +816,9 @@ int main(int argc, char **argv)
 			for (i = 0; i < numspecies; i++)
 				maxvel[i] /= sqrt(maxvel[i] * maxvel[i] + 1.0);
 		}
+		// done particle update
 		
 		tau += dtau;
-		
-		if (tau_Lambda < 0. && (cosmo.Omega_m / a / a / a) < cosmo.Omega_Lambda)
-		{
-			tau_Lambda = tau;
-			COUT << "matter-dark energy equality at z=" << ((1./a) - 1.) << endl;
-		}
 		
 		if (sim.wallclocklimit > 0.)   // check for wallclock time limit
 		{
@@ -1215,7 +860,6 @@ int main(int argc, char **argv)
 			restartcount++;
 		}
 		
-		dtau_older = dtau_old;
 		dtau_old = dtau;
 		
 		if (sim.Cf * dx < sim.steplimit / Hconf(a, fourpiG, cosmo))
@@ -1236,102 +880,8 @@ int main(int argc, char **argv)
 		ref_time = MPI_Wtime();
 #endif
 
-#ifdef UNITY_HACK
-	delete lcbuffer[0];
-	delete lcbuffer[1];
-	delete lcbuffer[2];
-#endif
-
-#ifndef HAVE_HEALPIX
-	if (sim.num_lightcone > 0) // metric lightcone output
-	{
-		for (i = 0, j = 0; i < sim.num_lightcone; i++)
-		{
-			j |= sim.out_lightcone[i];
-		}
-
-		if (j & MASK_PHI)
-		{
-			COUT << COLORTEXT_CYAN << " writing phi lightcone data" << COLORTEXT_RESET << endl;
-
-			for (i = 0; i < LIGHTCONE_THICKNESS; i++)
-			{
-				if (LIGHTCONE_THICKNESS > 1)
-					sprintf(filename, "_phi_%d.h5", i);
-				else
-					sprintf(filename, "_phi.h5");
-
-				lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_PHI_OFFSET+i]->saveHDF5(h5filename + sim.basename_lightcone + filename);
-
-				delete lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_PHI_OFFSET+i];
-			}
-
-			delete lclat[LIGHTCONE_PHI_OFFSET];
-		}
-
-		if (j & MASK_CHI)
-		{
-			COUT << COLORTEXT_CYAN << " writing chi lightcone data" << COLORTEXT_RESET << endl;
-
-			for (i = 0; i < LIGHTCONE_THICKNESS; i++)
-			{
-				if (LIGHTCONE_THICKNESS > 1)
-					sprintf(filename, "_chi_%d.h5", i);
-				else
-					sprintf(filename, "_chi.h5");
-
-				lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_CHI_OFFSET+i]->saveHDF5(h5filename + sim.basename_lightcone + filename);
-
-				delete lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_CHI_OFFSET+i];
-			}
-
-			delete lclat[LIGHTCONE_CHI_OFFSET];
-		}
-
-		if (j & MASK_B)
-		{
-			COUT << COLORTEXT_CYAN << " writing B lightcone data" << COLORTEXT_RESET << endl;
-
-			for (i = 0; i < 3*LIGHTCONE_THICKNESS; i++)
-			{
-				if (LIGHTCONE_THICKNESS > 1)
-					sprintf(filename, "_B%d_%d.h5", (i%3)+1, i/3);
-				else
-					sprintf(filename, "_B%d.h5", i+1);
-
-				lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_B_OFFSET+i]->saveHDF5(h5filename + sim.basename_lightcone + filename);
-
-				delete lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_B_OFFSET+i];
-			}
-
-			delete lclat[LIGHTCONE_B_OFFSET];
-		}
-
-		if (j & MASK_HIJ)
-		{
-			COUT << COLORTEXT_CYAN << " writing hij lightcone data" << COLORTEXT_RESET << endl;
-
-			for (i = 0; i < 5*LIGHTCONE_THICKNESS; i++)
-			{
-				if (LIGHTCONE_THICKNESS > 1)
-					sprintf(filename, "_h%d%d_%d.h5", ((i%5) < 3 ? 1 : 2), (i%5) + ((i%5) < 3 ? 1 : -1), i/5);
-				else
-					sprintf(filename, "_h%d%d.h5", (i < 3 ? 1 : 2), i + (i < 3 ? 1 : -1));
-
-				lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+i]->saveHDF5(h5filename + sim.basename_lightcone + filename);			
-	
-				delete lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+i];
-			}
-
-			delete lclat[LIGHTCONE_HIJ_OFFSET];
-		}
-	}
-#endif
-
 #ifdef HAVE_CLASS
-#ifndef COSIRA_HACK
 	if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
-#endif // COSIRA_HACK
 		freeCLASSstructures(class_background, class_thermo, class_perturbs);
 #endif
 

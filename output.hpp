@@ -2,11 +2,11 @@
 // output.hpp
 //////////////////////////
 // 
-// Output of snapshots and spectra
+// Output of snapshots, light cones and spectra
 //
-// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London & Universität Zürich)
+// Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London)
 //
-// Last modified: December 2020
+// Last modified: March 2020
 //
 //////////////////////////
 
@@ -33,9 +33,9 @@ using namespace std;
 //   a              scale factor
 //   snapcount      snapshot index
 //   h5filename     base name for HDF5 output file
-//   pcls_cdm       pointer to (uninitialized) particle handler for CDM
-//   pcls_b         pointer to (uninitialized) particle handler for baryons
-//   pcls_ncdm      array of (uninitialized) particle handlers for
+//   pcls_cdm       pointer to particle handler for CDM
+//   pcls_b         pointer to particle handler for baryons
+//   pcls_ncdm      array of particle handlers for
 //                  non-cold DM (may be set to NULL)
 //   phi            pointer to allocated field
 //   chi            pointer to allocated field
@@ -50,15 +50,23 @@ using namespace std;
 //   plan_Bi        pointer to FFT planner
 //   plan_source    pointer to FFT planner
 //   plan_Sij       pointer to FFT planner
-//   Bi_check       pointer to allocated field (or NULL)
-//   BiFT_check     pointer to allocated field (or NULL)
-//   plan_Bi_check  pointer to FFT planner (or NULL)
+//   Bi_check       pointer to allocated field
+//   BiFT_check     pointer to allocated field
+//   plan_Bi_check  pointer to FFT planner
+//   vi             pointer to allocated field
 //
 // Returns:
 // 
 //////////////////////////
 
-void writeSnapshots(metadata & sim, cosmology & cosmo, const double fourpiG, const double a, const double dtau_old, const int done_hij, const int snapcount, string h5filename, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * chi, Field<Real> * Bi, Field<Real> * source, Field<Real> * Sij, Field<Cplx> * scalarFT, Field<Cplx> * BiFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_phi, PlanFFT<Cplx> * plan_chi, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_source, PlanFFT<Cplx> * plan_Sij, Field<Real> * Bi_check = NULL, Field<Cplx> * BiFT_check = NULL, PlanFFT<Cplx> * plan_Bi_check = NULL)
+void writeSnapshots(metadata & sim, cosmology & cosmo, const double fourpiG, const double a, const double dtau_old, const int done_hij, const int snapcount, string h5filename, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * chi, Field<Real> * Bi, Field<Real> * source, Field<Real> * Sij, Field<Cplx> * scalarFT, Field<Cplx> * BiFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_phi, PlanFFT<Cplx> * plan_chi, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_source, PlanFFT<Cplx> * plan_Sij
+#ifdef CHECK_B
+, Field<Real> * Bi_check, Field<Cplx> * BiFT_check, PlanFFT<Cplx> * plan_Bi_check
+#endif
+#ifdef VELOCITY
+, Field<Real> * vi
+#endif
+)
 {
 	char filename[2*PARAM_MAX_LENGTH+24];
 	char buffer[64];
@@ -88,6 +96,11 @@ void writeSnapshots(metadata & sim, cosmology & cosmo, const double fourpiG, con
 	
 	if (sim.out_snapshot & MASK_T00)
 		source->saveHDF5_server_open(h5filename + filename + "_T00");
+
+#ifdef VELOCITY		
+	if (sim.out_snapshot & MASK_VEL)
+		vi->saveHDF5_server_open(h5filename + filename + "_v");
+#endif
 				
 	if (sim.out_snapshot & MASK_B)
 		Bi->saveHDF5_server_open(h5filename + filename + "_B");
@@ -175,6 +188,20 @@ void writeSnapshots(metadata & sim, cosmology & cosmo, const double fourpiG, con
 			source->saveHDF5(h5filename + filename + "_T00.h5");
 #endif
 	}
+	
+#ifdef VELOCITY		
+	if (sim.out_snapshot & MASK_VEL)
+	{
+#ifdef EXTERNAL_IO
+		vi->saveHDF5_server_write(NUMBER_OF_IO_FILES);
+#else
+		if (sim.downgrade_factor > 1)
+			vi->saveHDF5_coarseGrain3D(h5filename + filename + "_v.h5", sim.downgrade_factor);
+		else
+			vi->saveHDF5(h5filename + filename + "_v.h5");
+#endif
+	}
+#endif
 				
 	if (sim.out_snapshot & MASK_B)
 	{
@@ -443,18 +470,50 @@ void writeSnapshots(metadata & sim, cosmology & cosmo, const double fourpiG, con
 }
 
 
-#if LIGHTCONE_THICKNESS > 3
-#error This implementation of writeLightcones does not support LIGHTCONE_THICKNESS > 3
-#endif
+//////////////////////////
+// writeLightcones
+//////////////////////////
+// Description:
+//   output of light cones
+// 
+// Arguments:
+//   sim            simulation metadata structure
+//   cosmo          cosmological parameter structure
+//   fourpiG        4 pi G (in code units)
+//   a              scale factor
+//   tau            conformal time
+//   dtau           conformal time step
+//   dtau_old       conformal time step of previous cycle
+//   maxvel         maximum cdm velocity
+//   cycle          current simulation cycle
+//   h5filename     base name for HDF5 output file
+//   pcls_cdm       pointer to particle handler for CDM
+//   pcls_b         pointer to particle handler for baryons
+//   pcls_ncdm      array of particle handlers for
+//                  non-cold DM (may be set to NULL)
+//   phi            pointer to allocated field
+//   chi            pointer to allocated field
+//   Bi             pointer to allocated field
+//   Sij            pointer to allocated field
+//   BiFT           pointer to allocated field
+//   SijFT          pointer to allocated field
+//   plan_Bi        pointer to FFT planner
+//   plan_Sij       pointer to FFT planner
+//   done_hij       reference to tensor projection flag
+//   IDbacklog      IDs of particles written in previous cycle
+//
+// Returns:
+// 
+//////////////////////////
 
-void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, const double a, const double tau, const double dtau, const double dtau_old, const double dtau_older, const double maxvel, const int cycle, string h5filename, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * chi, Field<Real> * Bi, Field<Real> * Sij, Field<Cplx> * BiFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_Sij, Field<Real> * lcbuffer[LIGHTCONE_MAX_FIELDS*LIGHTCONE_THICKNESS], Lattice * lclat[LIGHTCONE_MAX_FIELDS], int & done_hij, set<long> * IDbacklog)
+void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, const double a, const double tau, const double dtau, const double dtau_old, const double maxvel, const int cycle, string h5filename, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * chi, Field<Real> * Bi, Field<Real> * Sij, Field<Cplx> * BiFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_Sij, int & done_hij, set<long> * IDbacklog)
 {
-	int i, j, n, p; //, skip;
+	int i, j, n, p;
 	double d;
 	double vertex[MAX_INTERSECTS][3];
 	double domain[6];
 	double pos[3];
-	double s[4];
+	double s[2];
 	char filename[2*PARAM_MAX_LENGTH+24];
 	char buffer[268];
 	FILE * outfile;
@@ -463,13 +522,9 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 	long * IDcombuf;
 	long * IDcombuf2;
 	Site xsim;
-	Site xlc;
 	int done_B = 0;
 #ifdef HAVE_HEALPIX
-	//Real * pixel[LIGHTCONE_MAX_FIELDS];
 	int64_t pix, pix2, q;
-	//vector< healpix_header > shellheader;
-	//vector< vector<Real *> > shelldata[LIGHTCONE_MAX_FIELDS];
 	vector<int> pixbatch_id;
 	vector<int> sender_proc;
 	vector<int> pixbatch_size[3];
@@ -489,22 +544,12 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 	double temp;
 	int base_pos[3];
 	int shell, shell_inner, shell_outer, shell_write;
-	//int proc[LIGHTCONE_MAX_FIELDS];
-	//int proc_start[LIGHTCONE_MAX_FIELDS];
-	//int64_t bytes[LIGHTCONE_MAX_FIELDS];
-	//int64_t batch;
 	uint32_t blocksize;
 	MPI_File mapfile;
 	MPI_Status status;
 	MPI_Datatype patch;
-	//int max_write_operations[3];
-	//vector<int> write_operations;
-	//vector<int> write_count;
-	//vector<int> write_operations_all;
-	//int write_operations_done;
 	int io_group_size;
 	long pixcount = 0;
-	//double time_mapping = 0, time_comm = 0, time_writing;
 	
 	for (j = 0; j < 9*LIGHTCONE_MAX_FIELDS; j++)
 		pixbuf[j/9][j%9] = NULL;
@@ -541,25 +586,18 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 			else if (cycle == 0)
 			{
 				if (sim.num_lightcone > 1)
-					fprintf(outfile, "# information file for lightcone %d\n# geometric parameters:\n# vertex = (%f, %f, %f) Mpc/h\n# redshift = %f\n# distance = (%f - %f) Mpc/h\n# opening half-angle = %f degrees\n# direction = (%f, %f, %f)\n# cycle   tau/boxsize    a              pcl_inner        pcl_outer        metric_inner", i, sim.lightcone[i].vertex[0]*sim.boxsize, sim.lightcone[i].vertex[1]*sim.boxsize, sim.lightcone[i].vertex[2]*sim.boxsize, sim.lightcone[i].z, sim.lightcone[i].distance[0]*sim.boxsize, sim.lightcone[i].distance[1]*sim.boxsize, (sim.lightcone[i].opening > -1.) ? acos(sim.lightcone[i].opening) * 180. / M_PI : 180., sim.lightcone[i].direction[0], sim.lightcone[i].direction[1], sim.lightcone[i].direction[2]);
+					fprintf(outfile, "# information file for lightcone %d\n# geometric parameters:\n# vertex = (%f, %f, %f) Mpc/h\n# redshift = %f\n# distance = (%f - %f) Mpc/h\n# opening half-angle = %f degrees\n# direction = (%f, %f, %f)\n# cycle   tau/boxsize    a              pcl_inner        pcl_outer        metric_inner     metric_outer\n", i, sim.lightcone[i].vertex[0]*sim.boxsize, sim.lightcone[i].vertex[1]*sim.boxsize, sim.lightcone[i].vertex[2]*sim.boxsize, sim.lightcone[i].z, sim.lightcone[i].distance[0]*sim.boxsize, sim.lightcone[i].distance[1]*sim.boxsize, (sim.lightcone[i].opening > -1.) ? acos(sim.lightcone[i].opening) * 180. / M_PI : 180., sim.lightcone[i].direction[0], sim.lightcone[i].direction[1], sim.lightcone[i].direction[2]);
 				else
-					fprintf(outfile, "# information file for lightcone\n# geometric parameters:\n# vertex = (%f, %f, %f) Mpc/h\n# redshift = %f\n# distance = (%f - %f) Mpc/h\n# opening half-angle = %f degrees\n# direction = (%f, %f, %f)\n# cycle   tau/boxsize    a              pcl_inner        pcl_outer        metric_inner", sim.lightcone[i].vertex[0]*sim.boxsize, sim.lightcone[i].vertex[1]*sim.boxsize, sim.lightcone[i].vertex[2]*sim.boxsize, sim.lightcone[i].z, sim.lightcone[i].distance[0]*sim.boxsize, sim.lightcone[i].distance[1]*sim.boxsize, (sim.lightcone[i].opening > -1.) ? acos(sim.lightcone[i].opening) * 180. / M_PI : 180., sim.lightcone[i].direction[0], sim.lightcone[i].direction[1], sim.lightcone[i].direction[2]);
-
-#ifndef HAVE_HEALPIX
-				for (j = 1; j < LIGHTCONE_THICKNESS; j++)
-					fprintf(outfile, "     metric_(%d/%d)", j-1, j);
-#endif
-
-				fprintf(outfile, "     metric_outer\n");
+					fprintf(outfile, "# information file for lightcone\n# geometric parameters:\n# vertex = (%f, %f, %f) Mpc/h\n# redshift = %f\n# distance = (%f - %f) Mpc/h\n# opening half-angle = %f degrees\n# direction = (%f, %f, %f)\n# cycle   tau/boxsize    a              pcl_inner        pcl_outer        metric_inner     metric_outer\n", sim.lightcone[i].vertex[0]*sim.boxsize, sim.lightcone[i].vertex[1]*sim.boxsize, sim.lightcone[i].vertex[2]*sim.boxsize, sim.lightcone[i].z, sim.lightcone[i].distance[0]*sim.boxsize, sim.lightcone[i].distance[1]*sim.boxsize, (sim.lightcone[i].opening > -1.) ? acos(sim.lightcone[i].opening) * 180. / M_PI : 180., sim.lightcone[i].direction[0], sim.lightcone[i].direction[1], sim.lightcone[i].direction[2]);
 			}
 		}
 
 		d = particleHorizon(1. / (1. + sim.lightcone[i].z), fourpiG, cosmo);
 
-#ifdef HAVE_HEALPIX
 		s[0] = d - tau - 0.5 * sim.covering[i] * dtau;
 		s[1] = d - tau + 0.5 * sim.covering[i] * dtau_old;
 
+#ifdef HAVE_HEALPIX
 		shell_inner = (s[0] > sim.lightcone[i].distance[1]) ? ceil(s[0] * sim.numpts * sim.shellfactor[i]) : ceil(sim.lightcone[i].distance[1] * sim.numpts * sim.shellfactor[i]);
 		shell_outer = (sim.lightcone[i].distance[0] > s[1]) ? floor(s[1] * sim.numpts * sim.shellfactor[i]) : (ceil(sim.lightcone[i].distance[0] * sim.numpts * sim.shellfactor[i])-1);
 		if (shell_outer < shell_inner && s[1] > 0) shell_outer = shell_inner;
@@ -599,36 +637,13 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 			R[2][1] = 0;
 			R[2][2] = sim.lightcone[i].direction[2];
 		}
+#endif
 
 		if (sim.lightcone[i].distance[0] > s[0] && sim.lightcone[i].distance[1] <= s[1] && s[1] > 0.)
-#else
-#if LIGHTCONE_THICKNESS == 2
-		s[0] = d - tau - dtau;
-		s[1] = d - tau;
-		s[2] = d - tau + dtau_old;
-#elif LIGHTCONE_THICKNESS == 3
-		s[0] = d - tau - 2. * dtau;
-		s[1] = d - tau - 0.5 * dtau;
-		s[2] = d - tau + 0.5 * dtau_old;
-		s[3] = d - tau + dtau_old + 0.5 * dtau_older;
-#else
-		s[0] = d - tau - 0.5 * dtau;
-		s[1] = d - tau + 0.5 * dtau_old;
-#endif
-
-		if (sim.lightcone[i].distance[0] > s[1] && sim.lightcone[i].distance[1] <= s[LIGHTCONE_THICKNESS] && s[LIGHTCONE_THICKNESS] > 0.)
-#endif
 		{
 			if (parallel.isRoot() && outfile != NULL)
 			{
-				fprintf(outfile, "%6d   %e   %e   %2.12f   %2.12f   %2.12f", cycle, tau, a, d - tau - 0.5 * dtau, d - tau + 0.5 * dtau_old, s[0]);
-#ifndef HAVE_HEALPIX
-				for (j = 1; j < LIGHTCONE_THICKNESS; j++)
-					fprintf(outfile, "   %2.12f", s[j]);
-				fprintf(outfile, "   %2.12f\n", s[LIGHTCONE_THICKNESS]);
-#else
-				fprintf(outfile, "   %2.12f\n", s[1]);
-#endif
+				fprintf(outfile, "%6d   %e   %e   %2.12f   %2.12f   %2.12f   %2.12f\n", cycle, tau, a, d - tau - 0.5 * dtau, d - tau + 0.5 * dtau_old, s[0], s[1]);
 				fclose(outfile);
 
 				if (sim.num_lightcone > 1)
@@ -650,100 +665,15 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 
 					fwrite((const void *) &cycle, sizeof(int), 1, outfile);
 					fwrite((const void *) buffer, sizeof(double), 4, outfile);
-					fwrite((const void *) s, sizeof(double), LIGHTCONE_THICKNESS+1, outfile);
+					fwrite((const void *) s, sizeof(double), 2, outfile);
 
 					fclose(outfile);
 				}
 			}
 
-#ifdef HAVE_HEALPIX
-			/*outbuf = (char *) malloc(sizeof(Real) * PIXBUFFER);
-
-			for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-				proc[j] = -1;
-
-			j = (sim.out_lightcone[i] & MASK_PHI) ? 1 : 0;
-			if (sim.out_lightcone[i] & MASK_CHI) j += 1;
-			if (sim.out_lightcone[i] & MASK_B) j += 3;
-			if (sim.out_lightcone[i] & MASK_HIJ) j += 5;
-#ifdef UNITY_HACK
-			j += 3;
-#endif
-
-			if (j > parallel.size())
-			{
-				COUT << COLORTEXT_RED << " error" << COLORTEXT_RESET << ": number of tasks must be larger than number of field components in light cone output! Some data will not be written." << endl;
-				j = parallel.size();
-			}
-
-			p = 0;
-			if (sim.out_lightcone[i] & MASK_PHI)
-			{
-				pixel[LIGHTCONE_PHI_OFFSET] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_PHI_OFFSET] = p;
-				p += parallel.size() / j;
-			}
-			if (sim.out_lightcone[i] & MASK_CHI)
-			{
-				pixel[LIGHTCONE_CHI_OFFSET] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_CHI_OFFSET] = p;
-				p += parallel.size() / j;
-			}
-			if (sim.out_lightcone[i] & MASK_B)
-			{
-				pixel[LIGHTCONE_B_OFFSET] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_B_OFFSET] = p;
-				p += parallel.size() / j;
-				pixel[LIGHTCONE_B_OFFSET+1] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_B_OFFSET+1] = p;
-				p += parallel.size() / j;
-				pixel[LIGHTCONE_B_OFFSET+2] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_B_OFFSET+2] = p;
-				p += parallel.size() / j;
-			}
-#ifndef UNITY_HACK
-			if (sim.out_lightcone[i] & MASK_HIJ)
-			{
-				pixel[LIGHTCONE_HIJ_OFFSET] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_HIJ_OFFSET] = p;
-				p += parallel.size() / j;
-				pixel[LIGHTCONE_HIJ_OFFSET+1] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_HIJ_OFFSET+1] = p;
-				p += parallel.size() / j;
-				pixel[LIGHTCONE_HIJ_OFFSET+2] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_HIJ_OFFSET+2] = p;
-				p += parallel.size() / j;
-				pixel[LIGHTCONE_HIJ_OFFSET+3] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_HIJ_OFFSET+3] = p;
-				p += parallel.size() / j;
-				pixel[LIGHTCONE_HIJ_OFFSET+4] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				proc[LIGHTCONE_HIJ_OFFSET+4] = p;
-				p += parallel.size() / j;
-			}
-#else
-			pixel[LIGHTCONE_CDM_OFFSET] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-			proc[LIGHTCONE_CDM_OFFSET] = p;
-			p += parallel.size() / j;
-			pixel[LIGHTCONE_NCDM_OFFSET] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-			proc[LIGHTCONE_NCDM_OFFSET] = p;
-			p += parallel.size() / j;
-			pixel[LIGHTCONE_RSD_OFFSET] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-			proc[LIGHTCONE_RSD_OFFSET] = p;
-			p += parallel.size() / j;
-#endif
-
-			for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-				proc_start[j] = proc[j];
-	
-			for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-				bytes[j] = 0;
-
-			batch = 0;*/
-			
+#ifdef HAVE_HEALPIX	
 			bytes = 0;
 			bytes2 = 0;
-			
-			//outbuf = (char *) malloc(268 * (shell_outer + 1 - shell_inner));
 			
 			for (j = 0; j < 9; j++)
 				pixbuf_reserve[j] = PIXBUFFER;
@@ -769,8 +699,7 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 					pixbuf[LIGHTCONE_B_OFFSET+2][j] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
 				}
 			}
-		
-#ifndef UNITY_HACK
+
 			if (sim.out_lightcone[i] & MASK_HIJ)
 			{
 				for (j = 0; j < 9; j++)
@@ -781,15 +710,7 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 					pixbuf[LIGHTCONE_HIJ_OFFSET+3][j] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
 					pixbuf[LIGHTCONE_HIJ_OFFSET+4][j] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
 				}
-			}	
-#else
-			for (j = 0; j < 9; j++)
-			{
-				pixbuf[LIGHTCONE_CDM_OFFSET][j] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				pixbuf[LIGHTCONE_NCDM_OFFSET][j] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
-				pixbuf[LIGHTCONE_RSD_OFFSET][j] = (Real *) malloc(sizeof(Real) * PIXBUFFER);
 			}
-#endif
 
 			if (sim.gr_flag == 0 && sim.out_lightcone[i] & MASK_B && done_B == 0)
 			{
@@ -816,8 +737,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 				shell_write = ((shell_outer + 1 - shell_inner) * parallel.rank()) / parallel.size();
 				io_group_size = (((shell_write+1) * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner)) - ((shell_write * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner));
 			}
-				
-			//cerr << " proc#" << parallel.rank() << ": shell_write = " << shell_write << ", io_group_size = " << io_group_size << endl;
 
 			for (shell = shell_inner; shell <= shell_outer; shell++)
 			{
@@ -827,17 +746,8 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 				{
 					if (12. * maphdr.Nside * maphdr.Nside > sim.pixelfactor[i] * 4. * M_PI * maphdr.distance * maphdr.distance * sim.numpts * sim.numpts) break;
 				}
-
-				/*maphdr.Npix = 4;
-				for (p = 2; p < 4 * maphdr.Nside && maphdr.Npix < (1. - sim.lightcone[i].opening) * 6 * maphdr.Nside * maphdr.Nside; p++)
-				{
-					if (p <= maphdr.Nside) maphdr.Npix += 4 * p;
-					else if (p <= 3 * maphdr.Nside - 1) maphdr.Npix += 4 * maphdr.Nside;
-					else maphdr.Npix += 4 * (4 * maphdr.Nside - p);
-				}*/
 				
 				for (maphdr.Nside_ring = 2; 2.137937882409166 * sim.numpts * maphdr.distance / maphdr.Nside_ring > phi->lattice().sizeLocal(1) && 2.137937882409166 * sim.numpts * maphdr.distance / maphdr.Nside_ring > phi->lattice().sizeLocal(2) && maphdr.Nside_ring < maphdr.Nside; maphdr.Nside_ring *= 2);
-				
 				
 				if (sim.lightcone[i].opening > 2./3.)
 				{
@@ -867,7 +777,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 				pixbatch_delim[0].push_back((pixbatch_delim[1].back() > 0) ? pixbatch_delim[1].back()-1 : 0);
 				pixbatch_delim[2].push_back(pixbatch_delim[1].back()+1);
 				pixbatch_size[1].push_back((pixbatch_size[0].back() * (pixbatch_size[0].back()+1) + (2*pixbatch_size[0].back() - 1 - p%pixbatch_size[0].back()) * (p%pixbatch_size[0].back())) / 2);
-				//pixbatch_size[2] = ((pixbatch_size[0] - p%pixbatch_size[0] - 1) * (pixbatch_size[0] - p%pixbatch_size[0])) / 2;
 				pixbatch_size[2].push_back(((p%pixbatch_size[0].back() + 1) * (p%pixbatch_size[0].back())) / 2);
 				pixbatch_size[0].back() *= pixbatch_size[0].back();
 				for (p = 0; p < 3; p++)
@@ -887,55 +796,7 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 				
 				for (j = 0; j < 9; j++)
 					pixbuf_size[j] = 0;
-					
-				//COUT << " shell " << shell << " contains " << pixbatch_delim[0].back() << ", " << pixbatch_delim[1].back() - pixbatch_delim[0].back() << ", " << pixbatch_delim[2].back() - pixbatch_delim[1].back() << " patches of size " << pixbatch_size[0].back() << ", " << pixbatch_size[1].back() << ", " << pixbatch_size[2].back() << endl;
-					
-				//time_mapping = MPI_Wtime() - time_mapping;
 				
-				/*for (j = 0; j < 3; j++)	
-					max_write_operations[j] = 0;*/
-				
-				/*if (parallel.isRoot())
-					shellheader.push_back(maphdr);
-
-				blocksize = 256;
-				memcpy((void *) buffer, (void *) &blocksize, sizeof(uint32_t));
-				memcpy((void *) (buffer+4), (void *) &maphdr, sizeof(healpix_header));
-				memcpy((void *) (buffer+260), (void *) &blocksize, sizeof(uint32_t));
-				blocksize = maphdr.precision * maphdr.Npix;
-				memcpy((void *) (buffer+264), (void *) &blocksize, sizeof(uint32_t));
-
-				for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-				{
-					if (parallel.rank() == proc[j])
-					{
-						if ((PIXBUFFER * sizeof(Real)) - batch < 268)
-						{
-							memcpy((void *) (outbuf+batch), (void *) buffer, (sizeof(Real) * PIXBUFFER) - batch);
-							batch = PIXBUFFER * sizeof(Real);
-						}
-						else
-						{
-							memcpy((void *) (outbuf+batch), (void *) buffer, 268);
-							batch += 268;
-						}
-					}
-
-					if (proc_start[j] >= 0 && proc_start[j] < parallel.size())
-						bytes[j] += 268;
-
-					if (bytes[j] / (PIXBUFFER * sizeof(Real)) > proc[j] - proc_start[j])
-					{
-						proc[j]++;
-						if (parallel.rank() == proc[j])
-						{
-							batch = bytes[j] % (PIXBUFFER * sizeof(Real));
-							memcpy((void *) outbuf, (void *) (buffer+268-batch), batch);
-						}
-					}
-				}*/
-
-				//for (p = 0; p < maphdr.Npix; p++)
 				for (p = 0; p < pixbatch_delim[2].back(); p++)
 				{
 					pix2vec_ring64(maphdr.Nside_ring, p, w);
@@ -962,7 +823,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 					
 					if ((io_group_size == 0 && parallel.rank() == ((shell - shell_inner) * parallel.size()) / (shell_outer + 1 - shell_inner)) || (io_group_size > 0 && shell - shell_inner == shell_write && ((pixbatch_delim[2].back() >= io_group_size && p / (pixbatch_delim[2].back() / io_group_size) < io_group_size && p / (pixbatch_delim[2].back() / io_group_size) == parallel.rank() - (shell_write * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner)) || (parallel.rank() - (shell_write * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner) == io_group_size - 1 && (pixbatch_delim[2].back() < io_group_size || p / (pixbatch_delim[2].back() / io_group_size) >= io_group_size))))) {
 						sender_proc.push_back(j);
-						//cerr << " proc#" << parallel.rank() << ": expecting patch " << p << " in proc#" << j << endl;
 					}
 					
 					if (commdir[0] * commdir[0] > 1 || commdir[1] * commdir[1] > 1) continue;
@@ -975,8 +835,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 					else pixbatch_type = 2;
 					
 					j = 3*commdir[0]+commdir[1]+4;
-					
-					//if (j == 4) cerr << " proc#" << parallel.rank() << ": patch " << p << " in domain" << endl;
 					
 					if (pixbuf_size[j] + pixbatch_size[pixbatch_type].back() > pixbuf_reserve[j])
 					{
@@ -1132,7 +990,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 								*(pixbuf[LIGHTCONE_B_OFFSET+2][j]+pixbuf_size[j]+q) /= a * a * sim.numpts;
 #endif
 							}
-#ifndef UNITY_HACK
 							if (sim.out_lightcone[i] & MASK_HIJ)
 							{
 								*(pixbuf[LIGHTCONE_HIJ_OFFSET][j]+pixbuf_size[j]+q) = (1.-w[0]) * (1.-w[1]) * ((1.-w[2]) * (*Sij)(xsim,0,0) + w[2] * (*Sij)(xsim+2,0,0));
@@ -1155,104 +1012,9 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 								*(pixbuf[LIGHTCONE_HIJ_OFFSET+4][j]+pixbuf_size[j]+q) = (1.-w[0]) * 0.25 * ((*Sij)(xsim,1,2) + (1.-w[1]) * ((*Sij)(xsim-1,1,2) + (1.-w[2]) * (*Sij)(xsim-1-2,1,2) + w[2] * (*Sij)(xsim-1+2,1,2)) + w[1] * ((*Sij)(xsim+1,1,2) + (1.-w[2]) * (*Sij)(xsim+1-2,1,2) + w[2] * (*Sij)(xsim+1+2,1,2)) + (1.-w[2]) * (*Sij)(xsim-2,1,2) + w[2] * (*Sij)(xsim+2,1,2));
 								*(pixbuf[LIGHTCONE_HIJ_OFFSET+4][j]+pixbuf_size[j]+q) += w[0] * 0.25 * ((*Sij)(xsim+0,1,2) + (1.-w[1]) * ((*Sij)(xsim+0-1,1,2) + (1.-w[2]) * (*Sij)(xsim+0-1-2,1,2) + w[2] * (*Sij)(xsim+0-1+2,1,2)) + w[1] * ((*Sij)(xsim+0+1,1,2) + (1.-w[2]) * (*Sij)(xsim+0+1-2,1,2) + w[2] * (*Sij)(xsim+0+1+2,1,2)) + (1.-w[2]) * (*Sij)(xsim+0-2,1,2) + w[2] * (*Sij)(xsim+0+2,1,2));
 							}
-#else // UNITY_HACK
-							*(pixbuf[LIGHTCONE_CDM_OFFSET][j]+pixbuf_size[j]+q) = (1.-w[0]) * (1.-w[1]) * ((1.-w[2]) * (*lcbuffer[1])(xsim) + w[2] * (*lcbuffer[1])(xsim+2));
-							*(pixbuf[LIGHTCONE_CDM_OFFSET][j]+pixbuf_size[j]+q) += w[0] * (1.-w[1]) * ((1.-w[2]) * (*lcbuffer[1])(xsim+0) + w[2] * (*lcbuffer[1])(xsim+0+2));
-							*(pixbuf[LIGHTCONE_CDM_OFFSET][j]+pixbuf_size[j]+q) += w[0] * w[1] * ((1.-w[2]) * (*lcbuffer[1])(xsim+0+1) + w[2] * (*lcbuffer[1])(xsim+0+1+2));
-							*(pixbuf[LIGHTCONE_CDM_OFFSET][j]+pixbuf_size[j]+q) += (1.-w[0]) * w[1] * ((1.-w[2]) * (*lcbuffer[1])(xsim+1) + w[2] * (*lcbuffer[1])(xsim+1+2));
-							*(pixbuf[LIGHTCONE_NCDM_OFFSET][j]+pixbuf_size[j]+q) = (1.-w[0]) * (1.-w[1]) * ((1.-w[2]) * (*lcbuffer[0])(xsim) + w[2] * (*lcbuffer[0])(xsim+2));
-							*(pixbuf[LIGHTCONE_NCDM_OFFSET][j]+pixbuf_size[j]+q) += w[0] * (1.-w[1]) * ((1.-w[2]) * (*lcbuffer[0])(xsim+0) + w[2] * (*lcbuffer[0])(xsim+0+2));
-							*(pixbuf[LIGHTCONE_NCDM_OFFSET][j]+pixbuf_size[j]+q) += w[0] * w[1] * ((1.-w[2]) * (*lcbuffer[0])(xsim+0+1) + w[2] * (*lcbuffer[0])(xsim+0+1+2));
-							*(pixbuf[LIGHTCONE_NCDM_OFFSET][j]+pixbuf_size[j]+q) += (1.-w[0]) * w[1] * ((1.-w[2]) * (*lcbuffer[0])(xsim+1) + w[2] * (*lcbuffer[0])(xsim+1+2));
-							*(pixbuf[LIGHTCONE_RSD_OFFSET][j]+pixbuf_size[j]+q) = (1.-w[0]) * (1.-w[1]) * ((1.-w[2]) * (*lcbuffer[2])(xsim) + w[2] * (*lcbuffer[2])(xsim+2));
-							*(pixbuf[LIGHTCONE_RSD_OFFSET][j]+pixbuf_size[j]+q) += w[0] * (1.-w[1]) * ((1.-w[2]) * (*lcbuffer[2])(xsim+0) + w[2] * (*lcbuffer[2])(xsim+0+2));
-							*(pixbuf[LIGHTCONE_RSD_OFFSET][j]+pixbuf_size[j]+q) += w[0] * w[1] * ((1.-w[2]) * (*lcbuffer[2])(xsim+0+1) + w[2] * (*lcbuffer[2])(xsim+0+1+2));
-							*(pixbuf[LIGHTCONE_RSD_OFFSET][j]+pixbuf_size[j]+q) += (1.-w[0]) * w[1] * ((1.-w[2]) * (*lcbuffer[2])(xsim+1) + w[2] * (*lcbuffer[2])(xsim+1+2));
-						
-							if (*(pixbuf[LIGHTCONE_CDM_OFFSET][j]+pixbuf_size[j]+q) > 1.0e-9) *(pixbuf[LIGHTCONE_RSD_OFFSET][j]+pixbuf_size[j]+q) /= *(pixbuf[LIGHTCONE_CDM_OFFSET][j]+pixbuf_size[j]+q);
-							else *(pixbuf[LIGHTCONE_RSD_OFFSET][j]+pixbuf_size[j]+q) = 0.;
-#endif
 						}
 						else
 						{
-						/*if (base_pos[1] >= phi->lattice().coordSkip()[1] && base_pos[1] < phi->lattice().coordSkip()[1] + phi->lattice().sizeLocal(1))
-						{
-							skip = (base_pos[2] < phi->lattice().coordSkip()[0]) ? (phi->lattice().coordSkip()[0] - base_pos[2]) : (base_pos[2] - phi->lattice().coordSkip()[0]);
-							if (skip >= sim.numpts / 2) temp = sim.numpts - skip;
-							else temp = skip;
-
-							skip = (base_pos[2] < phi->lattice().coordSkip()[0] + phi->lattice().sizeLocal(2)) ? (phi->lattice().coordSkip()[0] + phi->lattice().sizeLocal(2) - base_pos[2]) : (base_pos[2] - phi->lattice().coordSkip()[0] - phi->lattice().sizeLocal(2));
-							if (skip >= sim.numpts / 2) skip = sim.numpts - skip;
-
-							if (skip < temp) temp = skip;
-						}
-						else if (base_pos[2] >= phi->lattice().coordSkip()[0] && base_pos[2] < phi->lattice().coordSkip()[0] + phi->lattice().sizeLocal(2))
-						{
-							skip = (base_pos[1] < phi->lattice().coordSkip()[1]) ? (phi->lattice().coordSkip()[1] - base_pos[1]) : (base_pos[1] - phi->lattice().coordSkip()[1]);
-							if (skip >= sim.numpts / 2) temp = sim.numpts - skip;
-							else temp = skip;
-
-							skip = (base_pos[1] < phi->lattice().coordSkip()[1] + phi->lattice().sizeLocal(1)) ? (phi->lattice().coordSkip()[1] + phi->lattice().sizeLocal(1) - base_pos[1]) : (base_pos[1] - phi->lattice().coordSkip()[1] - phi->lattice().sizeLocal(1));
-							if (skip >= sim.numpts / 2) skip = sim.numpts - skip;
-
-							if (skip < temp) temp = skip;
-						}
-						else
-						{
-							if (base_pos[2] < phi->lattice().coordSkip()[0])
-							{
-								temp = (phi->lattice().coordSkip()[0] - base_pos[2]) * (phi->lattice().coordSkip()[0] - base_pos[2]);						
-								skip = (base_pos[2] + sim.numpts - phi->lattice().coordSkip()[0] - phi->lattice().sizeLocal(2)) * (base_pos[2] + sim.numpts - phi->lattice().coordSkip()[0] - phi->lattice().sizeLocal(2));
-							}
-							else
-							{
-								temp = (phi->lattice().coordSkip()[0] + phi->lattice().sizeLocal(2) - base_pos[2]) * (phi->lattice().coordSkip()[0] + phi->lattice().sizeLocal(2) - base_pos[2]);								
-								skip = (base_pos[2] - sim.numpts - phi->lattice().coordSkip()[0]) * (base_pos[2] - sim.numpts - phi->lattice().coordSkip()[0]);
-							}
-							
-							if (skip < temp) temp = skip;
-
-							if (base_pos[1] < phi->lattice().coordSkip()[1])
-							{
-								skip = (base_pos[1] + sim.numpts - phi->lattice().coordSkip()[1] - phi->lattice().sizeLocal(1));
-								temp += ((phi->lattice().coordSkip()[1] - base_pos[1]) * (phi->lattice().coordSkip()[1] - base_pos[1]) < skip * skip) ? ((phi->lattice().coordSkip()[1] - base_pos[1]) * (phi->lattice().coordSkip()[1] - base_pos[1])) : (skip * skip);
-							}
-							else
-							{
-								skip = (base_pos[1] - sim.numpts - phi->lattice().coordSkip()[1]);
-								temp += ((phi->lattice().coordSkip()[1] + phi->lattice().sizeLocal(1) - base_pos[1]) * (phi->lattice().coordSkip()[1] + phi->lattice().sizeLocal(1) - base_pos[1]) < skip * skip) ? ((phi->lattice().coordSkip()[1] + phi->lattice().sizeLocal(1) - base_pos[1]) * (phi->lattice().coordSkip()[1] + phi->lattice().sizeLocal(1) - base_pos[1])) : (skip * skip);
-							}
-							
-							temp = sqrt(temp);
-						}
-
-						if (maphdr.distance > 0.)						
-							skip = floor(temp / sim.numpts / maphdr.distance / sqrt(2. - sqrt(4. - 16. / 9. / maphdr.Nside / maphdr.Nside) * cos(0.75 * M_PI / maphdr.Nside)));
-						else skip = 0;
-						
-						if (skip + (p % PIXBUFFER) >= PIXBUFFER) skip = PIXBUFFER-1 - (p % PIXBUFFER);
-
-						if (sim.out_lightcone[i] & MASK_PHI)
-							memset((void *) (pixel[LIGHTCONE_PHI_OFFSET] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-						if (sim.out_lightcone[i] & MASK_CHI)
-							memset((void *) (pixel[LIGHTCONE_CHI_OFFSET] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-						if (sim.out_lightcone[i] & MASK_B)
-						{
-							memset((void *) (pixel[LIGHTCONE_B_OFFSET] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-							memset((void *) (pixel[LIGHTCONE_B_OFFSET+1] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-							memset((void *) (pixel[LIGHTCONE_B_OFFSET+2] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-						}
-						if (sim.out_lightcone[i] & MASK_HIJ)
-						{
-							memset((void *) (pixel[LIGHTCONE_HIJ_OFFSET] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-							memset((void *) (pixel[LIGHTCONE_HIJ_OFFSET+1] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-							memset((void *) (pixel[LIGHTCONE_HIJ_OFFSET+2] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-							memset((void *) (pixel[LIGHTCONE_HIJ_OFFSET+3] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-							memset((void *) (pixel[LIGHTCONE_HIJ_OFFSET+4] + (p % PIXBUFFER)), 0, (skip+1)*sizeof(Real));
-						}
-						
-						p += skip;*/
-						
 							if (sim.out_lightcone[i] & MASK_PHI)
 								*(pixbuf[LIGHTCONE_PHI_OFFSET][j]+pixbuf_size[j]+q) = 0;
 							if (sim.out_lightcone[i] & MASK_CHI)
@@ -1263,7 +1025,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 								*(pixbuf[LIGHTCONE_B_OFFSET+1][j]+pixbuf_size[j]+q) = 0;
 								*(pixbuf[LIGHTCONE_B_OFFSET+2][j]+pixbuf_size[j]+q) = 0;
 							}
-#ifndef UNITY_HACK
 							if (sim.out_lightcone[i] & MASK_HIJ)
 							{
 								*(pixbuf[LIGHTCONE_HIJ_OFFSET][j]+pixbuf_size[j]+q) = 0;
@@ -1272,59 +1033,8 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 								*(pixbuf[LIGHTCONE_HIJ_OFFSET+3][j]+pixbuf_size[j]+q) = 0;
 								*(pixbuf[LIGHTCONE_HIJ_OFFSET+4][j]+pixbuf_size[j]+q) = 0;
 							}
-#else
-							*(pixbuf[LIGHTCONE_CDM_OFFSET][j]+pixbuf_size[j]+q) = 0;
-							*(pixbuf[LIGHTCONE_NCDM_OFFSET][j]+pixbuf_size[j]+q) = 0;
-							*(pixbuf[LIGHTCONE_RSD_OFFSET][j]+pixbuf_size[j]+q) = 0;
-#endif
 						}
-
-/*					if ((p+1) % PIXBUFFER == 0)
-					{
-						for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-						{
-							if (parallel.rank() == proc[j])
-							{
-#ifdef SINGLE
-								MPI_Reduce(MPI_IN_PLACE, pixel[j], PIXBUFFER, MPI_FLOAT, MPI_SUM, proc[j], parallel.lat_world_comm());
-#else
-								MPI_Reduce(MPI_IN_PLACE, pixel[j], PIXBUFFER, MPI_DOUBLE, MPI_SUM, proc[j], parallel.lat_world_comm());
-#endif
-								memcpy((void *) (outbuf+batch), (void *) pixel[j], (PIXBUFFER * sizeof(Real)) - batch);
-								if (batch > 0)
-									parallel.send<char>(((char *) pixel[j]) + (PIXBUFFER * sizeof(Real)) - batch, batch, proc[j]+1);
-								batch = PIXBUFFER * sizeof(Real);
-							}
-							else if (proc[j] >= parallel.size() && proc_start[j] < parallel.size())
-							{
-								COUT << COLORTEXT_RED << " error" << COLORTEXT_RESET << ": insufficient PIXBUFFER for parallel Healpix output!" << endl;
-								parallel.abortForce();
-							}
-							else if (proc[j] >= 0 && proc[j] < parallel.size())
-							{
-#ifdef SINGLE
-								MPI_Reduce(pixel[j], NULL, PIXBUFFER, MPI_FLOAT, MPI_SUM, proc[j], parallel.lat_world_comm());
-#else
-								MPI_Reduce(pixel[j], NULL, PIXBUFFER, MPI_DOUBLE, MPI_SUM, proc[j], parallel.lat_world_comm());
-#endif
-							}
-							if (proc[j] >= 0)
-							{
-								proc[j]++;
-								bytes[j] += PIXBUFFER * sizeof(Real);
-								if (parallel.rank() == proc[j] && bytes[j] % (PIXBUFFER * sizeof(Real)) > 0)
-								{
-									if (batch > 0)
-									{
-										cout << COLORTEXT_RED << " error" << COLORTEXT_RESET << ": task " << parallel.rank() << " insufficient PIXBUFFER for parallel Healpix output!" << endl;
-										exit(-200);
-									}
-									batch = bytes[j] % (PIXBUFFER * sizeof(Real));
-									parallel.receive<char>(outbuf, batch, proc[j]-1);
-								}
-							}
-						}
-					}*/
+						
 						q++;
 					} // q-loop
 					
@@ -1332,123 +1042,15 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 					
 					if (j == 4)
 					{
-						/*if (max_write_operations[pixbatch_type] == 0 || pixbatch_id.back() != p-1)
-						{
-							max_write_operations[pixbatch_type]++;
-							write_count.push_back(1);
-						}
-						else write_count.back()++;*/
-							
 						pixbatch_id.push_back(p);
 					}
 				} // p-loop
-
-				/*if (maphdr.Npix % PIXBUFFER > 0)
-				{
-					for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-					{
-						if (parallel.rank() == proc[j])
-						{
-#ifdef SINGLE
-							MPI_Reduce(MPI_IN_PLACE, pixel[j], maphdr.Npix % PIXBUFFER, MPI_FLOAT, MPI_SUM, proc[j], parallel.lat_world_comm());
-#else
-							MPI_Reduce(MPI_IN_PLACE, pixel[j], maphdr.Npix % PIXBUFFER, MPI_DOUBLE, MPI_SUM, proc[j], parallel.lat_world_comm());
-#endif
-							if ((maphdr.Npix % PIXBUFFER) * sizeof(Real) <= (PIXBUFFER * sizeof(Real)) - batch)
-							{
-								memcpy((void *) (outbuf+batch), (void *) pixel[j], (maphdr.Npix % PIXBUFFER) * sizeof(Real));
-								batch += (maphdr.Npix % PIXBUFFER) * sizeof(Real);
-							}
-							else
-							{
-								memcpy((void *) (outbuf+batch), (void *) pixel[j], (PIXBUFFER * sizeof(Real)) - batch);
-								parallel.send<char>(((char *) pixel[j]) + (PIXBUFFER * sizeof(Real)) - batch, ((maphdr.Npix % PIXBUFFER) - PIXBUFFER) * sizeof(Real) + batch, proc[j]+1);
-								batch = PIXBUFFER * sizeof(Real);
-							}
-						}
-						else if (proc[j] >= parallel.size() && proc_start[j] < parallel.size())
-						{
-							COUT << COLORTEXT_RED << " error" << COLORTEXT_RESET << ": insufficient PIXBUFFER for parallel Healpix output!" << endl;
-							parallel.abortForce();
-						}
-						else if (proc[j] >= 0 && proc[j] < parallel.size())
-						{
-#ifdef SINGLE
-							MPI_Reduce(pixel[j], NULL, maphdr.Npix % PIXBUFFER, MPI_FLOAT, MPI_SUM, proc[j], parallel.lat_world_comm());
-#else
-							MPI_Reduce(pixel[j], NULL, maphdr.Npix % PIXBUFFER, MPI_DOUBLE, MPI_SUM, proc[j], parallel.lat_world_comm());
-#endif
-						}
-
-						if (proc[j] >= 0)
-						{
-							bytes[j] += (maphdr.Npix % PIXBUFFER) * sizeof(Real);
-
-							if (bytes[j] / (PIXBUFFER * sizeof(Real)) > proc[j] - proc_start[j])
-							{
-								proc[j]++;
-								if (parallel.rank() == proc[j])
-								{
-									if (batch > 0)
-									{
-										cout << COLORTEXT_RED << " error" << COLORTEXT_RESET << ": task " << parallel.rank() << " insufficient PIXBUFFER for parallel Healpix output!" << endl;
-										exit(-200);
-									}
-									batch = bytes[j] % (PIXBUFFER * sizeof(Real));
-									if (batch > 0)
-										parallel.receive<char>(outbuf, batch, proc[j]-1);
-								}
-							}
-						}
-					}
-				}*/
-
-				/*for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-				{
-					if (parallel.rank() == proc[j])
-					{
-						if ((PIXBUFFER * sizeof(Real)) - batch < 4)
-						{
-							memcpy((void *) (outbuf+batch), (void *) (buffer+264), (sizeof(Real) * PIXBUFFER) - batch);
-							batch = PIXBUFFER * sizeof(Real);
-						}
-						else
-						{
-							memcpy((void *) (outbuf+batch), (void *) (buffer+264), 4);
-							batch += 4;
-						}
-					}
-
-					if (proc[j] >= 0)
-					{
-						bytes[j] += 4;
-
-						if (bytes[j] / (PIXBUFFER * sizeof(Real)) > proc[j] - proc_start[j])
-						{
-							proc[j]++;
-							if (parallel.rank() == proc[j])
-							{
-								if (batch > 0)
-								{
-									cout << COLORTEXT_RED << " error" << COLORTEXT_RESET << ": task " << parallel.rank() << " insufficient PIXBUFFER for parallel Healpix output!" << endl;
-									exit(-200);
-								}
-								batch = bytes[j] % (PIXBUFFER * sizeof(Real));
-								memcpy((void *) outbuf, (void *) (buffer+268-batch), batch);
-							}
-						}
-					}
-				}*/
-
-				//time_mapping = MPI_Wtime() - time_mapping;
 				
 				p = 0;
 				for (j = 0; j < 3; j++)
 				{
 					if (pixbuf_size[3*j]+pixbuf_size[3*j+1]+pixbuf_size[3*j+2] > p) p = pixbuf_size[3*j]+pixbuf_size[3*j+1]+pixbuf_size[3*j+2];
 				}
-
-				//time_comm = MPI_Wtime() - time_comm;
 				
 				if (p > 0)
 				{
@@ -1505,52 +1107,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 								}
 							}
 								
-							/*if (parallel.grid_rank()[0] % 2 == 0)
-							{
-								if (pixbuf_size[1] > 0)
-									parallel.send_dim0<Real>(pixbuf[j][1], pixbuf_size[1], (parallel.grid_size()[0]+parallel.grid_rank()[0]-1) % parallel.grid_size()[0]);
-								if (pixbuf_size[4] > 0)
-								{
-									parallel.receive_dim0<Real>(commbuf, pixbuf_size[4], (parallel.grid_rank()[0]+1) % parallel.grid_size()[0]);
-									for (q = 0; q < pixbuf_size[4]; q++)
-										*(pixbuf[j][4]+q) += commbuf[q];
-								}
-							}
-							else
-							{
-								if (pixbuf_size[4] > 0 && parallel.grid_size()[0] > 2)
-								{
-									parallel.receive_dim0<Real>(commbuf, pixbuf_size[4], (parallel.grid_rank()[0]+1) % parallel.grid_size()[0]);
-									for (q = 0; q < pixbuf_size[4]; q++)
-										*(pixbuf[j][4]+q) += commbuf[q];
-								}
-								if (pixbuf_size[1] > 0)
-									parallel.send_dim0<Real>(pixbuf[j][1], pixbuf_size[1], (parallel.grid_size()[0]+parallel.grid_rank()[0]-1) % parallel.grid_size()[0]);
-							}
-							
-							if (parallel.grid_rank()[0] % 2 == 0)
-							{
-								if (pixbuf_size[2] > 0)
-									parallel.send_dim0<Real>(pixbuf[j][2], pixbuf_size[2], (parallel.grid_size()[0]+parallel.grid_rank()[0]-1) % parallel.grid_size()[0]);
-								if (pixbuf_size[5] > 0)
-								{
-									parallel.receive_dim0<Real>(commbuf, pixbuf_size[5], (parallel.grid_rank()[0]+1) % parallel.grid_size()[0]);
-									for (q = 0; q < pixbuf_size[5]; q++)
-										*(pixbuf[j][5]+q) += commbuf[q];
-								}
-							}
-							else
-							{
-								if (pixbuf_size[5] > 0 && parallel.grid_size()[0] > 2)
-								{
-									parallel.receive_dim0<Real>(commbuf, pixbuf_size[5], (parallel.grid_rank()[0]+1) % parallel.grid_size()[0]);
-									for (q = 0; q < pixbuf_size[5]; q++)
-										*(pixbuf[j][5]+q) += commbuf[q];
-								}
-								if (pixbuf_size[2] > 0)
-									parallel.send_dim0<Real>(pixbuf[j][2], pixbuf_size[2], (parallel.grid_size()[0]+parallel.grid_rank()[0]-1) % parallel.grid_size()[0]);
-							}*/
-								
 							if (parallel.grid_rank()[0] % 2 == 0)
 							{
 								if (pixbuf_size[6]+pixbuf_size[7]+pixbuf_size[8] > 0)
@@ -1597,52 +1153,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 									parallel.send_dim0<Real>(commbuf, pixbuf_size[6]+pixbuf_size[7]+pixbuf_size[8], (parallel.grid_rank()[0]+1) % parallel.grid_size()[0]);
 								}
 							}
-								
-							/*if (parallel.grid_rank()[0] % 2 == 0)
-							{
-								if (pixbuf_size[7] > 0)
-									parallel.send_dim0<Real>(pixbuf[j][7], pixbuf_size[7], (parallel.grid_rank()[0]+1) % parallel.grid_size()[0]);
-								if (pixbuf_size[4] > 0 && parallel.grid_size()[0] > 2)
-								{
-									parallel.receive_dim0<Real>(commbuf, pixbuf_size[4], (parallel.grid_size()[0]+parallel.grid_rank()[0]-1) % parallel.grid_size()[0]);
-									for (q = 0; q < pixbuf_size[4]; q++)
-										*(pixbuf[j][4]+q) += commbuf[q];
-								}
-							}
-							else
-							{
-								if (pixbuf_size[4] > 0)
-								{
-									parallel.receive_dim0<Real>(commbuf, pixbuf_size[4], (parallel.grid_size()[0]+parallel.grid_rank()[0]-1) % parallel.grid_size()[0]);
-									for (q = 0; q < pixbuf_size[4]; q++)
-										*(pixbuf[j][4]+q) += commbuf[q];
-								}
-								if (pixbuf_size[7] > 0)
-									parallel.send_dim0<Real>(pixbuf[j][7], pixbuf_size[7], (parallel.grid_rank()[0]+1) % parallel.grid_size()[0]);
-							}
-								
-							if (parallel.grid_rank()[0] % 2 == 0)
-							{
-								if (pixbuf_size[8] > 0)
-									parallel.send_dim0<Real>(pixbuf[j][8], pixbuf_size[8], (parallel.grid_rank()[0]+1) % parallel.grid_size()[0]);
-								if (pixbuf_size[5] > 0 && parallel.grid_size()[0] > 2)
-								{
-									parallel.receive_dim0<Real>(commbuf, pixbuf_size[5], (parallel.grid_size()[0]+parallel.grid_rank()[0]-1) % parallel.grid_size()[0]);
-									for (q = 0; q < pixbuf_size[5]; q++)
-										*(pixbuf[j][5]+q) += commbuf[q];
-								}
-							}
-							else
-							{
-								if (pixbuf_size[5] > 0)
-								{
-									parallel.receive_dim0<Real>(commbuf, pixbuf_size[5], (parallel.grid_size()[0]+parallel.grid_rank()[0]-1) % parallel.grid_size()[0]);
-									for (q = 0; q < pixbuf_size[5]; q++)
-										*(pixbuf[j][5]+q) += commbuf[q];
-								}
-								if (pixbuf_size[8] > 0)
-									parallel.send_dim0<Real>(pixbuf[j][8], pixbuf_size[8], (parallel.grid_rank()[0]+1) % parallel.grid_size()[0]);
-							}*/
 								
 							if (parallel.grid_rank()[1] % 2 == 0)
 							{
@@ -1697,7 +1207,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 				
 				if (io_group_size == 0 && parallel.rank() == ((shell - shell_inner) * parallel.size() / (shell_outer + 1 - shell_inner)))
 				{
-					//cerr << " proc#" << parallel.rank() << ": allocating memory for shell #" << shell - shell_inner << "; bytes2 = " << bytes2 << "; additional memory required = " << maphdr.Npix * maphdr.precision + 272 << endl;
 					for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
 					{
 						if (pixbuf[j][0] != NULL)
@@ -1742,24 +1251,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 					q = pixbatch_delim[2].back() / io_group_size;
 					p = parallel.rank() - (shell_write * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner);
 					
-					/*if (p * q >= pixbatch_delim[0].back())
-					{
-						offset2 = pixbatch_delim[0].back() * pixbatch_size[0].back() * maphdr.precision;
-						if (p * q >= pixbatch_delim[1].back())
-						{
-							offset2 += (pixbatch_delim[1].back()-pixbatch_delim[0].back()) * pixbatch_size[1].back() * maphdr.precision;
-							j = 2;
-						}
-						else j = 1;
-						
-						offset2 += (p * q - pixbatch_delim[j-1].back()) * pixbatch_size[j].back() * maphdr.precision;
-					}
-					else
-					{
-						offset2 = p * q * pixbatch_size[0].back() * maphdr.precision;
-						j = 0;
-					}*/
-					
 					for (j = 0; p * q >= pixbatch_delim[j].back(); j++);
 					
 					if ((p+1) * q >= pixbatch_delim[j].back() && j < 2)
@@ -1786,7 +1277,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 					
 					if (p == io_group_size-1)
 					{
-						//cerr << " proc#" << parallel.rank() << ": last in I/O group, j = " << j << ", bytes2 = " << bytes2;
 						bytes2 += 4;
 						q = pixbatch_delim[2].back() % io_group_size;
 						if (pixbatch_delim[2].back()-pixbatch_delim[1].back() < q)
@@ -1804,11 +1294,7 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 							bytes2 += q * pixbatch_size[2].back() * maphdr.precision;
 							
 						q += pixbatch_delim[2].back() / io_group_size;
-						
-						//cerr << ", " << bytes2 << endl;
 					}
-					
-					//cerr << " proc#" << parallel.rank() << ": allocating memory for shell #" << shell - shell_inner << "; bytes2 = " << bytes2 << "; number of patches = " << q << "/" << pixbatch_delim[2].back() << "; I/O group index = " << p << endl;
 					
 					for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
 					{
@@ -1848,7 +1334,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 				
 				pix = 0;
 				pix2 = 0;
-				//n = 1;
 				
 				if ((io_group_size == 0 && parallel.rank() == ((shell - shell_inner) * parallel.size()) / (shell_outer + 1 - shell_inner)) || (io_group_size > 0 && shell - shell_inner == shell_write))
 				{
@@ -1857,8 +1342,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 						cout << COLORTEXT_RED << " error" << COLORTEXT_RESET << ": proc#" << parallel.rank() << " pixel batch count mismatch! expecting " << q << " but sender list contains " << sender_proc.size() << " entries!" << endl;
 						exit(-99);
 					}
-					
-					//cerr << " proc#" << parallel.rank() << ": gathering " << q << " patches... ";
 				
 					for (int64_t p2 = p; p2 < p+q; p2 += n)
 					{
@@ -1868,7 +1351,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 							if (io_group_size > 0 && pixbatch_delim[2].back() >= io_group_size && pixbatch_id[pix] / (pixbatch_delim[2].back() / io_group_size) < io_group_size)
 							{
 								for (n = 1; pix+n < pixbatch_id.size() && pixbatch_id[pix+n] == pixbatch_id[pix+n-1]+1 && pixbatch_id[pix+n] < pixbatch_delim[pixbatch_type].back() && (pixbatch_id[pix+n] / (pixbatch_delim[2].back() / io_group_size) == pixbatch_id[pix] / (pixbatch_delim[2].back() / io_group_size) || pixbatch_id[pix] / (pixbatch_delim[2].back() / io_group_size) == io_group_size-1); n++);
-								//if (n > 1) cerr << " proc#" << parallel.rank() << ": case A sending " << n << " patches to " << (pixbatch_id[pix] / (pixbatch_delim[2].back() / io_group_size)) + ((shell - shell_inner) * parallel.size() + (io_group_size ? shell_outer - shell_inner : 0)) / (shell_outer + 1 - shell_inner) << " starting at index " << pixbatch_id[pix] << endl;
 								for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
 								{
 									if (pixbuf[j][4] != NULL && pixbatch_size[pixbatch_type].back() > 0)
@@ -1878,7 +1360,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 							else
 							{
 								for (n = 1; pix+n < pixbatch_id.size() && pixbatch_id[pix+n] == pixbatch_id[pix+n-1]+1 && pixbatch_id[pix+n] < pixbatch_delim[pixbatch_type].back(); n++);
-								//if (n > 1) cerr << " proc#" << parallel.rank() << ": case B sending " << n << " patches to " << (io_group_size ? io_group_size - 1 : 0) + ((shell - shell_inner) * parallel.size() + (io_group_size ? shell_outer - shell_inner : 0)) / (shell_outer + 1 - shell_inner) << " starting at index " << pixbatch_id[pix] << endl;
 								for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
 								{
 									if (pixbuf[j][4] != NULL && pixbatch_size[pixbatch_type].back() > 0)
@@ -1895,8 +1376,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 						
 						if (sender_proc[p2-p] == parallel.rank())
 						{
-							//cerr << p2-p << " (local) ";
-							//if (n > 1) cerr << " proc#" << parallel.rank() << ": local copy of " << n << " patches starting at index " << p2 << endl;
 							if (pix+n-1 >= pixbatch_id.size())
 							{
 								cerr << COLORTEXT_RED << " error" << COLORTEXT_RESET << ": proc#" << parallel.rank() << " pixel batch index mismatch! expecting " << p2 << " but ID list contains not enough elements!" << endl;
@@ -1917,8 +1396,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 						}
 						else
 						{
-							//cerr << p2-p << " (" << sender_proc[p2-p] << ") ";
-							//if (n > 1) cerr << " proc#" << parallel.rank() << ": receiving " << n << " patches from " << sender_proc[p2-p] << " starting at index " << p2 << endl;
 							for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
 							{
 								if (outbuf[j] != NULL && pixbatch_size[pixbatch_type].back() > 0)
@@ -1949,21 +1426,17 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 						else if (parallel.rank() == (shell_write * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner)) offset2 = 0;
 						else offset2 = 268;
 					}
-					
-					//cerr << "... gather complete." << endl;
 				}
 				
 				p = ((((shell + 1 - shell_inner) * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner)) - (((shell - shell_inner) * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner)));
 				
 				while (pix < pixbatch_id.size())
 				{
-					//cerr << " proc#" << parallel.rank() << ": sending patch " << pixbatch_id[pix] << " to " << (((pixbatch_id[pix] * ((((shell + 1 - shell_inner) * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner)) - (((shell - shell_inner) * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner)))) / pixbatch_delim[2].back()) + ((shell - shell_inner) * parallel.size() + (io_group_size ? shell_outer - shell_inner : 0)) / (shell_outer + 1 - shell_inner)) << endl;
 					for (pixbatch_type = 0; pixbatch_delim[pixbatch_type].back() <= pixbatch_id[pix]; pixbatch_type++);
 					
 					if (p > 0 && pixbatch_delim[2].back() >= p && pixbatch_id[pix] / (pixbatch_delim[2].back() / p) < p)
 					{
 						for (n = 1; pix+n < pixbatch_id.size() && pixbatch_id[pix+n] == pixbatch_id[pix+n-1]+1 && pixbatch_id[pix+n] < pixbatch_delim[pixbatch_type].back() && (pixbatch_id[pix+n] / (pixbatch_delim[2].back() / p) == pixbatch_id[pix] / (pixbatch_delim[2].back() / p) || pixbatch_id[pix] / (pixbatch_delim[2].back() / p) == p-1); n++);
-						//if (n > 1) cerr << " proc#" << parallel.rank() << ": case C sending " << n << " patches to " << (pixbatch_id[pix] / (pixbatch_delim[2].back() / p)) + ((shell - shell_inner) * parallel.size() + (io_group_size ? shell_outer - shell_inner : 0)) / (shell_outer + 1 - shell_inner) << " starting at index " << pixbatch_id[pix] << endl;
 						for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
 						{
 							if (pixbuf[j][4] != NULL && pixbatch_size[pixbatch_type].back() > 0)
@@ -1973,7 +1446,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 					else
 					{
 						for (n = 1; pix+n < pixbatch_id.size() && pixbatch_id[pix+n] == pixbatch_id[pix+n-1]+1 && pixbatch_id[pix+n] < pixbatch_delim[pixbatch_type].back(); n++);
-						//if (n > 1) cerr << " proc#" << parallel.rank() << ": case D sending " << n << " patches to " << (p ? p - 1 : 0) + ((shell - shell_inner) * parallel.size() + (io_group_size ? shell_outer - shell_inner : 0)) / (shell_outer + 1 - shell_inner) << " starting at index " << pixbatch_id[pix] << endl;
 						for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
 						{
 							if (pixbuf[j][4] != NULL && pixbatch_size[pixbatch_type].back() > 0)
@@ -1981,314 +1453,16 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 						}
 					}
 					
-					/*for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-					{
-						if (pixbuf[j][4] != NULL && pixbatch_size[pixbatch_type].back() > 0)
-						{
-							n = ((((shell + 1 - shell_inner) * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner)) - (((shell - shell_inner) * parallel.size() + shell_outer - shell_inner) / (shell_outer + 1 - shell_inner)));
-							if (pixbatch_delim[2].back() >= n && pixbatch_id[pix] / (pixbatch_delim[2].back() / n) < n)
-								parallel.send<Real>(pixbuf[j][4]+pix2, pixbatch_size[pixbatch_type].back(), (pixbatch_id[pix] / (pixbatch_delim[2].back() / n)) + ((shell - shell_inner) * parallel.size() + (io_group_size ? shell_outer - shell_inner : 0)) / (shell_outer + 1 - shell_inner));
-							else
-								parallel.send<Real>(pixbuf[j][4]+pix2, pixbatch_size[pixbatch_type].back(), n - 1 + ((shell - shell_inner) * parallel.size() + (io_group_size ? shell_outer - shell_inner : 0)) / (shell_outer + 1 - shell_inner));
-						}
-					}*/
 					pix += n;
 					pix2 += n*pixbatch_size[pixbatch_type].back();
 				}
 				
-				/*if (pixbuf_size[9] + pixbuf_size[4] > pixbuf_reserve[9])
-				{
-					do
-					{
-						pixbuf_reserve[9] += PIXBUFFER;
-					}
-					while (pixbuf_size[9] + pixbuf_size[4] > pixbuf_reserve[9]);
-					
-					for (q = 0; q < LIGHTCONE_MAX_FIELDS; q++)
-					{
-						if (pixbuf[q][9] != NULL)
-						{
-							pixbuf[q][9] = (Real *) realloc((void *) pixbuf[q][9], sizeof(Real) * pixbuf_reserve[9]);
-							if (pixbuf[q][9] == NULL)
-							{
-								cout << COLORTEXT_RED << " error" << COLORTEXT_RESET << ": proc#" << parallel.rank() << " unable to allocate memory for pixelisation!" << endl;
-								parallel.abortForce();
-							}
-						}
-					}
-				}
-				
-				if (pixbuf_size[4] > 0) // buffer data for I/O
-				{
-					for (q = 0; q < LIGHTCONE_MAX_FIELDS; q++)
-					{
-						if (pixbuf[q][9] != NULL)
-							memcpy((void *) (pixbuf[q][9] + pixbuf_size[9]), (void *) pixbuf[q][4], pixbuf_size[4] * sizeof(Real));
-					}
-					
-					pixbuf_size[9] += pixbuf_size[4];
-				}*/
-
-				//time_comm = MPI_Wtime() - time_comm;
-
-				//cerr << " proc#" << parallel.rank() << ": on cycle " << cycle << ", shell " << shell << ", " << pixcount << " pixels mapped in " << time_mapping << "s, communication took " << time_comm << "s" << endl;
-				
-				/* MPI_Type_contiguous(pixbatch_size[0]*sizeof(Real), MPI_BYTE, patch);
-				MPI_Type_commit(patch);
-				MPI_Type_contiguous(pixbatch_size[1]*sizeof(Real), MPI_BYTE, patch+1);
-				MPI_Type_commit(patch+1);
-				if (pixbatch_size[2] > 0)
-				{
-					MPI_Type_contiguous(pixbatch_size[2]*sizeof(Real), MPI_BYTE, patch+2);
-					MPI_Type_commit(patch+2);
-				} */
-				
 				offset.push_back(bytes);
 				bytes += maphdr.Npix * maphdr.precision + 272;
 				
-				/*for (p = 0; p < 3; p++)
-					write_operations.push_back(max_write_operations[p]);
-				
-				parallel.max<int>(max_write_operations, 3);
-				
-				for (p = 0; p < 3; p++)
-					write_operations_all.push_back(max_write_operations[p]);*/
-					
-				/*blocksize = 256;
-				memcpy((void *) (outbuf+(shell-shell_inner)*268), (void *) &blocksize, 4);
-				memcpy((void *) (outbuf+4+(shell-shell_inner)*268), (void *) &maphdr, 256);
-				memcpy((void *) (outbuf+260+(shell-shell_inner)*268), (void *) &blocksize, 4);
-				blocksize = maphdr.precision * maphdr.Npix;
-				memcpy((void *) (outbuf+264+(shell-shell_inner)*268), (void *) &blocksize, 4);*/
-				
-				/*if (shell == shell_inner) // calculate file size
-				{
-					pix = maphdr.Npix;
-					
-					for (p = shell_inner+1; p <= shell_outer; p++)
-					{
-						for (q = sim.Nside[i][0]; q < sim.Nside[i][1]; q *= 2)
-						{
-							if (sim.pixelfactor[i] * 12. * q * q > 4. * M_PI * p * p / sim.shellfactor[i] / sim.shellfactor[i]) break;
-						}
-				
-						if (sim.lightcone[i].opening > 2./3.)
-						{
-							q = 1 + (int64_t) floor(q * sqrt(3. - 3. * sim.lightcone[i].opening));
-							pix += 2 * q * (q+1);
-						}
-						else if (sim.lightcone[i].opening > -2./3.)
-						{
-							q = 1 + (int64_t) floor(q * (2. - 1.5 * sim.lightcone[i].opening));
-							pix += 2 * q * (q+1) + (1 + (int64_t) floor(q * (2. - 1.5 * sim.lightcone[i].opening)) - q) * 4 * q;
-						}
-						else if (sim.lightcone[i].opening > -1.)
-						{
-							pix += 12 * q * q;
-							q = (int64_t) floor(q * sqrt(3. + 3. * sim.lightcone[i].opening));
-							pix -= 2 * q * (q+1);
-						}
-						else
-						{
-							pix += 12 * q * q;
-						}
-					}
-					
-					bytes = pix * sizeof(Real) + 272 * (shell_outer + 1 - shell_inner);
-					offset = 0;
-				} 
-				
-				outbuf = (char *) malloc(268);
-				blocksize = 256;
-				memcpy((void *) outbuf, (void *) &blocksize, 4);
-				memcpy((void *) (outbuf+4), (void *) &maphdr, 256);
-				memcpy((void *) (outbuf+260), (void *) &blocksize, 4);
-				blocksize = maphdr.precision * maphdr.Npix;
-				memcpy((void *) (outbuf+264), (void *) &blocksize, 4);
-				
-				for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-				{
-					if (pixbuf[j][0] == NULL) continue;					
-					
-					if (sim.num_lightcone > 1)
-					{
-						if (j == LIGHTCONE_PHI_OFFSET)
-							sprintf(filename, "%s%s%d_%04d_phi.map", sim.output_path, sim.basename_lightcone, i, cycle);
-						else if (j == LIGHTCONE_CHI_OFFSET)
-							sprintf(filename, "%s%s%d_%04d_chi.map", sim.output_path, sim.basename_lightcone, i, cycle);
-						else if (j >= LIGHTCONE_B_OFFSET && j < LIGHTCONE_B_OFFSET+3)
-							sprintf(filename, "%s%s%d_%04d_B%d.map", sim.output_path, sim.basename_lightcone, i, cycle, j+1-LIGHTCONE_B_OFFSET);
-#ifndef UNITY_HACK
-						else if (j >= LIGHTCONE_HIJ_OFFSET && j < LIGHTCONE_HIJ_OFFSET+5)
-							sprintf(filename, "%s%s%d_%04d_h%d%d.map", sim.output_path, sim.basename_lightcone, i, cycle, (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : 2), j - LIGHTCONE_HIJ_OFFSET + (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : -1));
-#else
-						else if (j == LIGHTCONE_CDM_OFFSET)
-							sprintf(filename, "%s%s%d_%04d_cdm.map", sim.output_path, sim.basename_lightcone, i, cycle);
-						else if (j == LIGHTCONE_NCDM_OFFSET)
-							sprintf(filename, "%s%s%d_%04d_ncdm.map", sim.output_path, sim.basename_lightcone, i, cycle);
-						else if (j == LIGHTCONE_RSD_OFFSET)
-							sprintf(filename, "%s%s%d_%04d_rsd.map", sim.output_path, sim.basename_lightcone, i, cycle);
-#endif
-					}
-					else
-					{
-						if (j == LIGHTCONE_PHI_OFFSET)
-							sprintf(filename, "%s%s_%04d_phi.map", sim.output_path, sim.basename_lightcone, cycle);
-						else if (j == LIGHTCONE_CHI_OFFSET)
-							sprintf(filename, "%s%s_%04d_chi.map", sim.output_path, sim.basename_lightcone, cycle);
-						else if (j >= LIGHTCONE_B_OFFSET && j < LIGHTCONE_B_OFFSET+3)
-							sprintf(filename, "%s%s_%04d_B%d.map", sim.output_path, sim.basename_lightcone, cycle, j+1-LIGHTCONE_B_OFFSET);
-#ifndef UNITY_HACK
-						else if (j >= LIGHTCONE_HIJ_OFFSET && j < LIGHTCONE_HIJ_OFFSET+5)
-							sprintf(filename, "%s%s_%04d_h%d%d.map", sim.output_path, sim.basename_lightcone, cycle, (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : 2), j - LIGHTCONE_HIJ_OFFSET + (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : -1));
-#else
-						else if (j == LIGHTCONE_CDM_OFFSET)
-							sprintf(filename, "%s%s_%04d_cdm.map", sim.output_path, sim.basename_lightcone, cycle);
-						else if (j == LIGHTCONE_NCDM_OFFSET)
-							sprintf(filename, "%s%s_%04d_ncdm.map", sim.output_path, sim.basename_lightcone, cycle);
-						else if (j == LIGHTCONE_RSD_OFFSET)
-							sprintf(filename, "%s%s_%04d_rsd.map", sim.output_path, sim.basename_lightcone, cycle);
-#endif
-					}
-					
-					//bytes = 272 + maphdr.precision * maphdr.Npix;
-
-					time_writing = MPI_Wtime();
-
-					if (shell == shell_inner)
-					{
-						MPI_File_open(parallel.lat_world_comm(), filename, MPI_MODE_WRONLY | MPI_MODE_CREATE,  MPI_INFO_NULL, &mapfile);
-						MPI_File_set_size(mapfile, (MPI_Offset) bytes);
-					}
-					else
-					{
-						MPI_File_open(parallel.lat_world_comm(), filename, MPI_MODE_WRONLY,  MPI_INFO_NULL, &mapfile);
-						MPI_File_set_view(mapfile, offset, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
-					}
-					
-					if (parallel.isRoot())
-					{
-						//blocksize = 256;
-						//MPI_File_write_at(mapfile, offset, &blocksize, 4, MPI_BYTE, &status);
-						//MPI_File_write_at(mapfile, offset+4, &maphdr, 256, MPI_BYTE, &status);
-						//MPI_File_write_at(mapfile, offset+260, &blocksize, 4, MPI_BYTE, &status);
-						//blocksize = maphdr.precision * maphdr.Npix;
-						//memcpy((void *) (outbuf+264), (void *) &blocksize, 4);
-						MPI_File_write(mapfile, outbuf, 268, MPI_BYTE, &status);
-						MPI_File_write_at(mapfile, 268 + maphdr.precision * maphdr.Npix, &blocksize, 4, MPI_BYTE, &status);
-					}
-					
-					q = 0;
-					p = 0;
-					
-					if (max_write_operations[0] > 0)
-						MPI_File_set_view(mapfile, offset + (MPI_Offset) 268, patch[0], patch[0], "native", MPI_INFO_NULL);
-					
-					for (int ops = 0; ops < max_write_operations[0]; ops++)
-					{
-						if (p < pixbatch_id.size() && pixbatch_id[p] < pixbatch_delim[0])
-						{
-							for (pix = 1; p+pix < pixbatch_id.size() && pixbatch_id[p+pix] < pixbatch_delim[0] && pixbatch_id[p+pix] == pixbatch_id[p+pix-1]+1; pix++);
-							MPI_File_write_at_all(mapfile, (MPI_Offset) pixbatch_id[p], pixbuf[j][4]+q, pix, patch[0], &status);
-							p += pix;
-							q += pix * pixbatch_size[0];
-						}
-						else
-						{
-							MPI_File_write_at_all(mapfile, (MPI_Offset) pixbatch_delim[0], pixbuf[j][4]+q, 0, patch[0], &status);
-						}
-					}
-					
-					if (max_write_operations[1] > 0)
-						MPI_File_set_view(mapfile, offset + (MPI_Offset) (268 + pixbatch_delim[0] * pixbatch_size[0] * sizeof(Real)), patch[1], patch[1], "native", MPI_INFO_NULL);
-						
-					for (int ops = 0; ops < max_write_operations[1]; ops++)
-					{
-						if (p < pixbatch_id.size() && pixbatch_id[p] < pixbatch_delim[1])
-						{
-							for (pix = 1; p+pix < pixbatch_id.size() && pixbatch_id[p+pix] < pixbatch_delim[1] && pixbatch_id[p+pix] == pixbatch_id[p+pix-1]+1; pix++);
-							MPI_File_write_at_all(mapfile, (MPI_Offset) (pixbatch_id[p]-pixbatch_delim[0]), pixbuf[j][4]+q, pix, patch[1], &status);
-							p += pix;
-							q += pix * pixbatch_size[1];
-						}
-						else
-						{
-							MPI_File_write_at_all(mapfile, (MPI_Offset) pixbatch_delim[1]-pixbatch_delim[0], pixbuf[j][4]+q, 0, patch[1], &status);
-						}
-					}
-					
-					if (pixbatch_size[2] > 0)
-					{
-						if (max_write_operations[2] > 0)
-							MPI_File_set_view(mapfile, offset + (MPI_Offset) (268 + (pixbatch_delim[0] * pixbatch_size[0] + (pixbatch_delim[1]-pixbatch_delim[0]) * pixbatch_size[1]) * sizeof(Real)), patch[2], patch[2], "native", MPI_INFO_NULL);
-						
-						for (int ops = 0; ops < max_write_operations[2]; ops++)
-						{
-							if (p < pixbatch_id.size() && pixbatch_id[p] < pixbatch_delim[2])
-							{
-								for (pix = 1; p+pix < pixbatch_id.size() && pixbatch_id[p+pix] < pixbatch_delim[2] && pixbatch_id[p+pix] == pixbatch_id[p+pix-1]+1; pix++);
-								MPI_File_write_at_all(mapfile, (MPI_Offset) (pixbatch_id[p]-pixbatch_delim[1]), pixbuf[j][4]+q, pix, patch[2], &status);
-								p += pix;
-								q += pix * pixbatch_size[2];
-							}
-							else
-							{
-								MPI_File_write_at_all(mapfile, (MPI_Offset) pixbatch_delim[2]-pixbatch_delim[1], pixbuf[j][4]+q, 0, patch[2], &status);
-							}
-						}
-					}
-					
-					/*for (p = 0; p < pixbatch_id.size(); p++)
-					{
-						if (pixbatch_id[p] < pixbatch_delim[0])
-						{
-							pix = pixbatch_id[p] * pixbatch_size[0];
-							pix2 = pixbatch_size[0];
-						}
-						else if (pixbatch_id[p] < pixbatch_delim[1])
-						{
-							pix = pixbatch_delim[0]*pixbatch_size[0] + (pixbatch_id[p] - pixbatch_delim[0])*pixbatch_size[1];
-							pix2 = pixbatch_size[1];
-						}
-						else
-						{
-							pix = pixbatch_delim[0]*pixbatch_size[0] + (pixbatch_delim[1] - pixbatch_delim[0])*pixbatch_size[1] + (pixbatch_id[p] - pixbatch_delim[1])*pixbatch_size[2];
-							pix2 = pixbatch_size[2];
-						}
-						
-						while (p+1 < pixbatch_id.size() && pixbatch_id[p+1] == pixbatch_id[p]+1)
-						{
-							p++;
-							if (pixbatch_id[p] < pixbatch_delim[0]) pix2 += pixbatch_size[0];
-							else if (pixbatch_id[p] < pixbatch_delim[1]) pix2 += pixbatch_size[1];
-							else pix2 += pixbatch_size[2];
-						}
-						
-						MPI_File_write_at(mapfile, offset + (MPI_Offset) (268 + pix * sizeof(Real)), pixbuf[j][4]+q, pix2*sizeof(Real), MPI_BYTE, &status);
-						
-						q += pix2;
-					}*/
-
-/* //////					MPI_File_close(&mapfile);
-
-					time_writing = MPI_Wtime() - time_writing;
-
-					cerr << " proc#" << parallel.rank() << ": writing data to " << filename << " took " << time_writing << "s" << endl;
-				}
-				
-				offset += 272 + maphdr.Npix * maphdr.precision;
-				free(outbuf);
-				
-				MPI_Type_free(patch);
-				MPI_Type_free(patch+1);
-				if (pixbatch_size[2] > 0)
-					MPI_Type_free(patch+2);
-				*/
 				pixbatch_id.clear();
 				sender_proc.clear();
 			} // shell-loop
-			
-			//cerr << " proc#" << parallel.rank() << ": on cycle " << cycle << ", " << pixcount << " pixels mapped in " << time_mapping << "s, communication took " << time_comm << "s" << endl;
 			
 			if (io_group_size == 0)
 				offset2 = 0;
@@ -2305,17 +1479,8 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 						sprintf(filename, "%s%s%d_%04d_chi.map", sim.output_path, sim.basename_lightcone, i, cycle);
 					else if (j >= LIGHTCONE_B_OFFSET && j < LIGHTCONE_B_OFFSET+3)
 						sprintf(filename, "%s%s%d_%04d_B%d.map", sim.output_path, sim.basename_lightcone, i, cycle, j+1-LIGHTCONE_B_OFFSET);
-#ifndef UNITY_HACK
 					else if (j >= LIGHTCONE_HIJ_OFFSET && j < LIGHTCONE_HIJ_OFFSET+5)
 						sprintf(filename, "%s%s%d_%04d_h%d%d.map", sim.output_path, sim.basename_lightcone, i, cycle, (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : 2), j - LIGHTCONE_HIJ_OFFSET + (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : -1));
-#else
-					else if (j == LIGHTCONE_CDM_OFFSET)
-						sprintf(filename, "%s%s%d_%04d_cdm.map", sim.output_path, sim.basename_lightcone, i, cycle);
-					else if (j == LIGHTCONE_NCDM_OFFSET)
-						sprintf(filename, "%s%s%d_%04d_ncdm.map", sim.output_path, sim.basename_lightcone, i, cycle);
-					else if (j == LIGHTCONE_RSD_OFFSET)
-						sprintf(filename, "%s%s%d_%04d_rsd.map", sim.output_path, sim.basename_lightcone, i, cycle);
-#endif
 				}
 				else
 				{
@@ -2325,96 +1490,16 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 						sprintf(filename, "%s%s_%04d_chi.map", sim.output_path, sim.basename_lightcone, cycle);
 					else if (j >= LIGHTCONE_B_OFFSET && j < LIGHTCONE_B_OFFSET+3)
 						sprintf(filename, "%s%s_%04d_B%d.map", sim.output_path, sim.basename_lightcone, cycle, j+1-LIGHTCONE_B_OFFSET);
-#ifndef UNITY_HACK
 					else if (j >= LIGHTCONE_HIJ_OFFSET && j < LIGHTCONE_HIJ_OFFSET+5)
 						sprintf(filename, "%s%s_%04d_h%d%d.map", sim.output_path, sim.basename_lightcone, cycle, (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : 2), j - LIGHTCONE_HIJ_OFFSET + (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : -1));
-#else
-					else if (j == LIGHTCONE_CDM_OFFSET)
-						sprintf(filename, "%s%s_%04d_cdm.map", sim.output_path, sim.basename_lightcone, cycle);
-					else if (j == LIGHTCONE_NCDM_OFFSET)
-						sprintf(filename, "%s%s_%04d_ncdm.map", sim.output_path, sim.basename_lightcone, cycle);
-					else if (j == LIGHTCONE_RSD_OFFSET)
-						sprintf(filename, "%s%s_%04d_rsd.map", sim.output_path, sim.basename_lightcone, cycle);
-#endif
 				}
-
-				//time_writing = MPI_Wtime();
 
 				MPI_File_open(parallel.lat_world_comm(), filename, MPI_MODE_WRONLY | MPI_MODE_CREATE,  MPI_INFO_NULL, &mapfile);
 				MPI_File_set_size(mapfile, (MPI_Offset) bytes);
-				
-				//cerr << " proc#" << parallel.rank() << ": writing to file, bytes = " << bytes << " offset = " << offset[shell_write] << ", offset2 = " << offset2 << ", bytes2 = " << bytes2 << endl;
-				
 				MPI_File_write_at_all(mapfile, (MPI_Offset) offset[shell_write] + offset2, (void *) outbuf[j], bytes2, MPI_BYTE, &status);
-				
-				/*if (parallel.isRoot())
-					MPI_File_write(mapfile, outbuf, 268, MPI_BYTE, &status);
-					
-				q = 0;
-				p = 0;
-				write_operations_done = 0;
-				
-				for (shell = shell_inner; shell <= shell_outer; shell++)
-				{
-					if (shell > shell_inner)
-					{
-						MPI_File_set_view(mapfile, offset[shell-shell_inner]-4, MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
-						if (parallel.isRoot())
-							MPI_File_write(mapfile, outbuf+((shell-shell_inner)*268)-4, 272, MPI_BYTE, &status);
-					}
-					
-					for (pixbatch_type = 0; pixbatch_type < 3; pixbatch_type++)
-					{
-						if (write_operations_all[3*(shell-shell_inner)+pixbatch_type] > 0 && pixbatch_size[pixbatch_type][shell-shell_inner] > 0)
-						{
-							MPI_Type_contiguous(pixbatch_size[pixbatch_type][shell-shell_inner]*sizeof(Real), MPI_BYTE, &patch);
-							MPI_Type_commit(&patch);
-							
-							if (pixbatch_type == 0)
-								MPI_File_set_view(mapfile, offset[shell-shell_inner] + (MPI_Offset) 268, patch, patch, "native", MPI_INFO_NULL);
-							else if (pixbatch_type == 1)
-								MPI_File_set_view(mapfile, offset[shell-shell_inner] + (MPI_Offset) (268 + pixbatch_delim[0][shell-shell_inner] * pixbatch_size[0][shell-shell_inner] * sizeof(Real)), patch, patch, "native", MPI_INFO_NULL);
-							else
-								MPI_File_set_view(mapfile, offset[shell-shell_inner] + (MPI_Offset) (268 + (pixbatch_delim[0][shell-shell_inner] * pixbatch_size[0][shell-shell_inner] + (pixbatch_delim[1][shell-shell_inner]-pixbatch_delim[0][shell-shell_inner]) * pixbatch_size[1][shell-shell_inner]) * sizeof(Real)), patch, patch, "native", MPI_INFO_NULL);
-					
-							for (int ops = 0; ops < write_operations_all[3*(shell-shell_inner)+pixbatch_type]; ops++)
-							{
-								if (ops < write_operations[3*(shell-shell_inner)+pixbatch_type])
-								{
-									if (pixbatch_type > 0)
-										MPI_File_write_at_all(mapfile, (MPI_Offset) pixbatch_id[p]-pixbatch_delim[pixbatch_type-1][shell-shell_inner], pixbuf[j][9]+q, write_count[write_operations_done], patch, &status);
-									else
-										MPI_File_write_at_all(mapfile, (MPI_Offset) pixbatch_id[p], pixbuf[j][9]+q, write_count[write_operations_done], patch, &status);
-									p += write_count[write_operations_done];
-									q += write_count[write_operations_done] * pixbatch_size[pixbatch_type][shell-shell_inner];
-									write_operations_done++;
-								}
-								else if (pixbatch_type > 0)
-									MPI_File_write_at_all(mapfile, (MPI_Offset) pixbatch_delim[pixbatch_type][shell-shell_inner]-pixbatch_delim[pixbatch_type-1][shell-shell_inner], pixbuf[j][9]+q, 0, patch, &status);
-								else
-									MPI_File_write_at_all(mapfile, (MPI_Offset) pixbatch_delim[0][shell-shell_inner], pixbuf[j][9]+q, 0, patch, &status);
-							}
-							
-							MPI_Type_free(&patch);
-						}
-						else
-							write_operations_done += write_operations[3*(shell-shell_inner)+pixbatch_type]; // should be zero
-					}
-					
-				}
-				
-				MPI_File_set_view(mapfile, offset[shell_outer-shell_inner] + (MPI_Offset) (268 + (pixbatch_delim[0][shell_outer-shell_inner] * pixbatch_size[0][shell_outer-shell_inner] + (pixbatch_delim[1][shell_outer-shell_inner]-pixbatch_delim[0][shell_outer-shell_inner]) * pixbatch_size[1][shell_outer-shell_inner] + (pixbatch_delim[2][shell_outer-shell_inner]-pixbatch_delim[1][shell_outer-shell_inner]) * pixbatch_size[2][shell_outer-shell_inner]) * sizeof(Real)), MPI_BYTE, MPI_BYTE, "native", MPI_INFO_NULL);
-				if (parallel.isRoot())
-					MPI_File_write(mapfile, &blocksize, 4, MPI_BYTE, &status);*/
-					
 				MPI_File_close(&mapfile);
-
-				//time_writing = MPI_Wtime() - time_writing;
-
-				//cerr << " proc#" << parallel.rank() << ": writing data to " << filename << " took " << time_writing << "s" << endl;
 			}
 			
-			//pixbatch_id.clear();
 			for (j = 0; j < 3; j++)
 			{
 				pixbatch_size[j].clear();
@@ -2422,9 +1507,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 			}
 			
 			offset.clear();
-			/*write_operations.clear();
-			write_count.clear();
-			write_operations_all.clear();*/
 			
 			for (j = 0; j < 9*LIGHTCONE_MAX_FIELDS; j++)
 			{
@@ -2441,290 +1523,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 				{
 					free(outbuf[j]);
 					outbuf[j] = NULL;
-				}
-			}
-
-/*			for (j = 0; j < LIGHTCONE_MAX_FIELDS; j++)
-			{
-				if (proc_start[j] >= 0) free(pixel[j]);
-
-				if (bytes[j] == 0) continue;
-
-				if (sim.num_lightcone > 1)
-				{
-					if (j == LIGHTCONE_PHI_OFFSET)
-						sprintf(filename, "%s%s%d_%04d_phi.map", sim.output_path, sim.basename_lightcone, i, cycle);
-					else if (j == LIGHTCONE_CHI_OFFSET)
-						sprintf(filename, "%s%s%d_%04d_chi.map", sim.output_path, sim.basename_lightcone, i, cycle);
-					else if (j >= LIGHTCONE_B_OFFSET && j < LIGHTCONE_B_OFFSET+3)
-						sprintf(filename, "%s%s%d_%04d_B%d.map", sim.output_path, sim.basename_lightcone, i, cycle, j+1-LIGHTCONE_B_OFFSET);
-#ifndef UNITY_HACK
-					else if (j >= LIGHTCONE_HIJ_OFFSET && j < LIGHTCONE_HIJ_OFFSET+5)
-						sprintf(filename, "%s%s%d_%04d_h%d%d.map", sim.output_path, sim.basename_lightcone, i, cycle, (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : 2), j - LIGHTCONE_HIJ_OFFSET + (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : -1));
-#else
-					else if (j == LIGHTCONE_CDM_OFFSET)
-						sprintf(filename, "%s%s%d_%04d_cdm.map", sim.output_path, sim.basename_lightcone, i, cycle);
-					else if (j == LIGHTCONE_NCDM_OFFSET)
-						sprintf(filename, "%s%s%d_%04d_ncdm.map", sim.output_path, sim.basename_lightcone, i, cycle);
-					else if (j == LIGHTCONE_RSD_OFFSET)
-						sprintf(filename, "%s%s%d_%04d_rsd.map", sim.output_path, sim.basename_lightcone, i, cycle);
-#endif
-				}
-				else
-				{
-					if (j == LIGHTCONE_PHI_OFFSET)
-						sprintf(filename, "%s%s_%04d_phi.map", sim.output_path, sim.basename_lightcone, cycle);
-					else if (j == LIGHTCONE_CHI_OFFSET)
-						sprintf(filename, "%s%s_%04d_chi.map", sim.output_path, sim.basename_lightcone, cycle);
-					else if (j >= LIGHTCONE_B_OFFSET && j < LIGHTCONE_B_OFFSET+3)
-						sprintf(filename, "%s%s_%04d_B%d.map", sim.output_path, sim.basename_lightcone, cycle, j+1-LIGHTCONE_B_OFFSET);
-#ifndef UNITY_HACK
-					else if (j >= LIGHTCONE_HIJ_OFFSET && j < LIGHTCONE_HIJ_OFFSET+5)
-						sprintf(filename, "%s%s_%04d_h%d%d.map", sim.output_path, sim.basename_lightcone, cycle, (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : 2), j - LIGHTCONE_HIJ_OFFSET + (j - LIGHTCONE_HIJ_OFFSET < 3 ? 1 : -1));
-#else
-					else if (j == LIGHTCONE_CDM_OFFSET)
-						sprintf(filename, "%s%s_%04d_cdm.map", sim.output_path, sim.basename_lightcone, cycle);
-					else if (j == LIGHTCONE_NCDM_OFFSET)
-						sprintf(filename, "%s%s_%04d_ncdm.map", sim.output_path, sim.basename_lightcone, cycle);
-					else if (j == LIGHTCONE_RSD_OFFSET)
-						sprintf(filename, "%s%s_%04d_rsd.map", sim.output_path, sim.basename_lightcone, cycle);
-#endif
-				}
-
-				MPI_File_open(parallel.lat_world_comm(), filename, MPI_MODE_WRONLY | MPI_MODE_CREATE,  MPI_INFO_NULL, &mapfile);
-				MPI_File_set_size(mapfile, (MPI_Offset) bytes[j]);
-
-				if (parallel.rank() >= proc_start[j] && parallel.rank() <= proc[j] && batch > 0)
-					MPI_File_write_at(mapfile, (MPI_Offset) ((int64_t) (parallel.rank() - proc_start[j]) * PIXBUFFER * sizeof(Real)), outbuf, batch, MPI_BYTE, &status);
-
-				MPI_File_close(&mapfile);
-			}*/
-			
-			//if (parallel.isRoot())
-			//	shellheader.clear();
-
-			//free(outbuf);
-#else // !HAVE_HEALPIX
-			for (j = 0; j < LIGHTCONE_THICKNESS; j++)
-			{
-				if (sim.lightcone[i].distance[0] <= s[j+1] || sim.lightcone[i].distance[1] > s[j+1] || s[j+1] <= 0) continue;
-
-				n = findIntersectingLightcones(sim.lightcone[i], s[j+1], s[j], domain, vertex);
-
-				if (n > 0 && sim.out_lightcone[i] & MASK_PHI)
-				{
-					xsim.initialize(phi->lattice());
-					xlc.initialize((*lclat[LIGHTCONE_PHI_OFFSET]));
-
-					for (xsim.first(), xlc.first(); xsim.test(); xsim.next(), xlc.next())
-					{
-						for (p = 0; p < 3; p++)
-							pos[p] = (double) xsim.coord(p) / (double) sim.numpts;
-
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_PHI_OFFSET+j])(xlc) = (*phi)(xsim);
-								break;
-							}
-						}
-					}
-				}
-
-				if (n > 0 && sim.out_lightcone[i] & MASK_CHI)
-				{
-					xsim.initialize(chi->lattice());
-					xlc.initialize((*lclat[LIGHTCONE_CHI_OFFSET]));
-
-					for (xsim.first(), xlc.first(); xsim.test(); xsim.next(), xlc.next())
-					{
-						for (p = 0; p < 3; p++)
-							pos[p] = (double) xsim.coord(p) / (double) sim.numpts;
-
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_CHI_OFFSET+j])(xlc) = (*chi)(xsim);
-								break;
-							}
-						}
-					}
-				}
-
-				if (sim.gr_flag == 0 && sim.out_lightcone[i] & MASK_B && done_B == 0)
-				{
-					plan_Bi->execute(FFT_BACKWARD);
-					Bi->updateHalo();
-					done_B = 1;
-				}
-
-				if (n > 0 && sim.out_lightcone[i] & MASK_B)
-				{
-					xsim.initialize(Bi->lattice());
-					xlc.initialize((*lclat[LIGHTCONE_B_OFFSET]));
-
-					for (xsim.first(), xlc.first(); xsim.test(); xsim.next(), xlc.next())
-					{
-#ifdef LIGHTCONE_INTERPOLATE
-						for (p = 0; p < 3; p++)
-							pos[p] = (double) xsim.coord(p) / (double) sim.numpts;
-
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_B_OFFSET+3*j])(xlc) = ((*Bi)(xsim, 0) + (*Bi)(xsim-0, 0)) / (2. * a * a * sim.numpts);
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_B_OFFSET+3*j+1])(xlc) = ((*Bi)(xsim, 1) + (*Bi)(xsim-1, 1)) / (2. * a * a * sim.numpts);
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_B_OFFSET+3*j+2])(xlc) = ((*Bi)(xsim, 2) + (*Bi)(xsim-2, 2)) / (2. * a * a * sim.numpts);
-								break;
-							}
-						}
-#else
-						pos[0] = (0.5 + (double) xsim.coord(0)) / (double) sim.numpts;
-						pos[1] = (double) xsim.coord(1) / (double) sim.numpts;
-						pos[2] = (double) xsim.coord(2) / (double) sim.numpts;
-
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_B_OFFSET+3*j])(xlc) = (*Bi)(xsim, 0) / (a * a * sim.numpts);
-								break;
-							}
-						}
-
-						pos[0] = (double) xsim.coord(0) / (double) sim.numpts;
-						pos[1] = (0.5 + (double) xsim.coord(1)) / (double) sim.numpts;
-
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_B_OFFSET+3*j+1])(xlc) = (*Bi)(xsim, 1) / (a * a * sim.numpts);
-								break;
-							}
-						}
-
-						pos[1] = (double) xsim.coord(1) / (double) sim.numpts;
-						pos[2] = (0.5 + (double) xsim.coord(2)) / (double) sim.numpts;
-
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_B_OFFSET+3*j+2])(xlc) = (*Bi)(xsim, 2) / (a * a * sim.numpts);
-								break;
-							}
-						}
-#endif
-					}
-				}
-
-				if (sim.out_lightcone[i] & MASK_HIJ && done_hij == 0)
-				{
-					projectFTtensor(*SijFT, *SijFT);
-					plan_Sij->execute(FFT_BACKWARD);
-					Sij->updateHalo();
-					done_hij = 1;
-				}
-
-				if (n > 0 && sim.out_lightcone[i] & MASK_HIJ)
-				{
-					xsim.initialize(Sij->lattice());
-					xlc.initialize((*lclat[LIGHTCONE_HIJ_OFFSET]));
-
-					for (xsim.first(), xlc.first(); xsim.test(); xsim.next())
-					{
-#ifdef LIGHTCONE_DOWNGRADE
-						if ((xsim.coord(0) % LIGHTCONE_DOWNGRADE) > 0 || (xsim.coord(1) % LIGHTCONE_DOWNGRADE) > 0 || (xsim.coord(2) % LIGHTCONE_DOWNGRADE) > 0)
-							continue;
-#endif
-
-						for (p = 0; p < 3; p++)
-							pos[p] = (double) xsim.coord(p) / (double) sim.numpts;
-
-#ifdef LIGHTCONE_INTERPOLATE
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j])(xlc) = (*Sij)(xsim, 0, 0);
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+1])(xlc) = ((*Sij)(xsim, 0, 1) + (*Sij)(xsim-0, 0, 1) + (*Sij)(xsim-1, 0, 1) + (*Sij)(xsim-0-1, 0, 1)) / 4.;
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+2])(xlc) = ((*Sij)(xsim, 0, 2) + (*Sij)(xsim-0, 0, 2) + (*Sij)(xsim-2, 0, 2) + (*Sij)(xsim-0-2, 0, 2)) / 4.;
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+3])(xlc) = (*Sij)(xsim, 1, 1);
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+4])(xlc) = ((*Sij)(xsim, 1, 2) + (*Sij)(xsim-1, 1, 2) + (*Sij)(xsim-2, 1, 2) + (*Sij)(xsim-1-2, 1, 2)) / 4.;
-								break;
-							}
-						}
-#else
-#ifdef LIGHTCONE_DOWNGRADE
-						for (p = 0; p < 3; p++)
-							pos[p] += 0.5 / (double) sim.numpts;
-							
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j])(xlc) = ((*Sij)(xsim, 0, 0) + (*Sij)(xsim+0, 0, 0) + (*Sij)(xsim+1, 0, 0) + (*Sij)(xsim+1+0, 0, 0) + (*Sij)(xsim+2, 0, 0) + (*Sij)(xsim+2+0, 0, 0) + (*Sij)(xsim+2+1, 0, 0) + (*Sij)(xsim+2+1+0, 0, 0)) / 8.;
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+1])(xlc) = ((*Sij)(xsim, 0, 1) + (*Sij)(xsim+2, 0, 1)) / 2.;
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+2])(xlc) = ((*Sij)(xsim, 0, 2) + (*Sij)(xsim+1, 0, 2)) / 2.;
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+3])(xlc) = ((*Sij)(xsim, 1, 1) + (*Sij)(xsim+0, 1, 1) + (*Sij)(xsim+1, 1, 1) + (*Sij)(xsim+1+0, 1, 1) + (*Sij)(xsim+2, 1, 1) + (*Sij)(xsim+2+0, 1, 1) + (*Sij)(xsim+2+1, 1, 1) + (*Sij)(xsim+2+1+0, 1, 1)) / 8.;
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+4])(xlc) = ((*Sij)(xsim, 1, 2) + (*Sij)(xsim+0, 1, 2)) / 2.;
-								break;
-							}
-						}
-#else
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j])(xlc) = (*Sij)(xsim, 0, 0);
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+3])(xlc) = (*Sij)(xsim, 1, 1);
-								break;
-							}
-						}
-
-						pos[0] = (0.5 + (double) xsim.coord(0)) / (double) sim.numpts;
-						pos[1] = (0.5 + (double) xsim.coord(1)) / (double) sim.numpts;
-
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+1])(xlc) = (*Sij)(xsim, 0, 1);
-								break;
-							}
-						}
-
-						pos[1] = (double) xsim.coord(1) / (double) sim.numpts;
-						pos[2] = (0.5 + (double) xsim.coord(2)) / (double) sim.numpts;
-
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+2])(xlc) = (*Sij)(xsim, 0, 2);
-								break;
-							}
-						}
-
-						pos[0] = (double) xsim.coord(0) / (double) sim.numpts;
-						pos[1] = (0.5 + (double) xsim.coord(1)) / (double) sim.numpts;
-
-						for (p = 0; p < n; p++)
-						{
-							if (pointInShell(pos, sim.lightcone[i], s[j+1], s[j], vertex[p]))
-							{
-								(*lcbuffer[LIGHTCONE_THICKNESS*LIGHTCONE_HIJ_OFFSET+5*j+4])(xlc) = (*Sij)(xsim, 1, 2);
-								break;
-							}
-						}
-#endif
-#endif
-						xlc.next();
-					}
 				}
 			}
 #endif // HAVE_HEALPIX
@@ -2769,7 +1567,6 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 			else
 				sprintf(filename, "_%04d", cycle);
 
-			//pcls_cdm->saveGadget2(h5filename + filename + "_cdm", hdr, sim.lightcone[i], d - tau + (0.5 + maxvel) * dtau_old, d - tau - 0.5 * dtau, vertex, n, sim.tracer_factor[0]);
 			if (sim.tracer_factor[0] > 0)
 				pcls_cdm->saveGadget2(h5filename + filename + "_cdm", hdr, sim.lightcone[i], d - tau, dtau, dtau_old, a * Hconf(a, fourpiG, cosmo), vertex, n, IDbacklog[0], IDprelog[0], phi, sim.tracer_factor[0]); 
 
@@ -2933,14 +1730,13 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 // 
 // Arguments:
 //   sim            simulation metadata structure
-//   ic                settings for IC generation (contains the random seed)
 //   cosmo          cosmological parameter structure
 //   fourpiG        4 pi G (in code units)
 //   a              scale factor
 //   pkcount        spectrum output index
-//   pcls_cdm       pointer to (uninitialized) particle handler for CDM
-//   pcls_b         pointer to (uninitialized) particle handler for baryons
-//   pcls_ncdm      array of (uninitialized) particle handlers for
+//   pcls_cdm       pointer to particle handler for CDM
+//   pcls_b         pointer to particle handler for baryons
+//   pcls_ncdm      array of particle handlers for
 //                  non-cold DM (may be set to NULL)
 //   phi            pointer to allocated field
 //   chi            pointer to allocated field
@@ -2963,13 +1759,18 @@ void writeLightcones(metadata & sim, cosmology & cosmo, const double fourpiG, co
 // 
 //////////////////////////
 
-void writeSpectra(metadata & sim, icsettings & ic, cosmology & cosmo, const double fourpiG, const double a, const int pkcount,
+void writeSpectra(metadata & sim, cosmology & cosmo, const double fourpiG, const double a, const int pkcount,
 #ifdef HAVE_CLASS
-background & class_background, perturbs & class_perturbs,
-#else
-int cycle,
+background & class_background, perturbs & class_perturbs, icsettings & ic,
 #endif
-Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * chi, Field<Real> * Bi, Field<Real> * source, Field<Real> * Sij, Field<Cplx> * scalarFT, Field<Cplx> * BiFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_phi, PlanFFT<Cplx> * plan_chi, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_source, PlanFFT<Cplx> * plan_Sij, Field<Real> * Bi_check = NULL, Field<Cplx> * BiFT_check = NULL, PlanFFT<Cplx> * plan_Bi_check = NULL)
+Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * chi, Field<Real> * Bi, Field<Real> * source, Field<Real> * Sij, Field<Cplx> * scalarFT, Field<Cplx> * BiFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_phi, PlanFFT<Cplx> * plan_chi, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_source, PlanFFT<Cplx> * plan_Sij
+#ifdef CHECK_B
+, Field<Real> * Bi_check, Field<Cplx> * BiFT_check, PlanFFT<Cplx> * plan_Bi_check
+#endif
+#ifdef VELOCITY
+, Field<Real> * vi, Field<Cplx> * viFT, PlanFFT<Cplx> * plan_vi
+#endif
+)
 {
 	char filename[2*PARAM_MAX_LENGTH+24];
 	char buffer[64];
@@ -2995,6 +1796,25 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 	if (sim.out_pk & MASK_RBARE || sim.out_pk & MASK_DBARE || sim.out_pk & MASK_POT || ((sim.out_pk & MASK_T00 || sim.out_pk & MASK_DELTA) && sim.gr_flag == 0))
 	{
 		projection_init(source);
+#ifdef HAVE_CLASS
+		if ((sim.radiation_flag > 0 || sim.fluid_flag > 0) && sim.gr_flag == 0)
+		{
+			projection_T00_project(class_background, class_perturbs, *source, *scalarFT, plan_source, sim, ic, cosmo, fourpiG, a);
+			if (sim.out_pk & MASK_DELTA)
+			{
+				Omega_ncdm = 0;
+				for (i = 0; i < cosmo.num_ncdm; i++)
+				{
+					if (a < 1. / (sim.z_switch_deltancdm[i] + 1.) && cosmo.Omega_ncdm[i] > 0)
+						Omega_ncdm += bg_ncdm(a, cosmo, i);
+				}
+				plan_source->execute(FFT_FORWARD);
+				extractPowerSpectrum(*scalarFT, kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);
+				sprintf(filename, "%s%s%03d_deltaclass.dat", sim.output_path, sim.basename_pk, pkcount);
+				writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI * ((a < 1. / (sim.z_switch_deltarad + 1.) ? sim.radiation_flag : 0) * cosmo.Omega_rad / a + sim.fluid_flag * cosmo.Omega_fld / pow(a, 3. * cosmo.w0_fld) + Omega_ncdm) * ((a < 1. / (sim.z_switch_deltarad + 1.) ? sim.radiation_flag : 0) * cosmo.Omega_rad / a + sim.fluid_flag * cosmo.Omega_fld / pow(a, 3. * cosmo.w0_fld) + Omega_ncdm), filename, "power spectrum of delta for linear fields (CLASS)", a, sim.z_pk[pkcount]);
+			}
+		}
+#endif
 		scalarProjectionCIC_project(pcls_cdm, source);
 		if (sim.baryon_flag)
 			scalarProjectionCIC_project(pcls_b, source);
@@ -3163,15 +1983,10 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 	if ((sim.out_pk & MASK_T00 || sim.out_pk & MASK_DELTA) && sim.gr_flag > 0)
 	{
 		projection_init(source);
-
+#ifdef HAVE_CLASS
 		if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
 		{
-#ifdef HAVE_CLASS
 			projection_T00_project(class_background, class_perturbs, *source, *scalarFT, plan_source, sim, ic, cosmo, fourpiG, a);
-#else
-			sprintf(filename, "%s%s_z%d_tk.dat", sim.output_path, sim.basename_generic, cycle);
-			projection_T00_project(filename, *source, *scalarFT, plan_source, sim, ic, cosmo, fourpiG, a);
-#endif
 			if (sim.out_pk & MASK_DELTA)
 			{
 				Omega_ncdm = 0;
@@ -3186,7 +2001,7 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 				writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI * ((a < 1. / (sim.z_switch_deltarad + 1.) ? sim.radiation_flag : 0) * cosmo.Omega_rad / a + sim.fluid_flag * cosmo.Omega_fld / pow(a, 3. * cosmo.w0_fld) + Omega_ncdm) * ((a < 1. / (sim.z_switch_deltarad + 1.) ? sim.radiation_flag : 0) * cosmo.Omega_rad / a + sim.fluid_flag * cosmo.Omega_fld / pow(a, 3. * cosmo.w0_fld) + Omega_ncdm), filename, "power spectrum of delta for linear fields (CLASS)", a, sim.z_pk[pkcount]);
 			}
 		}
-
+#endif
 		projection_T00_project(pcls_cdm, source, a, phi);
 		if (sim.baryon_flag)
 			projection_T00_project(pcls_b, source, a, phi);
@@ -3360,6 +2175,26 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 		writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, a * a * a * a * sim.numpts * sim.numpts * 2. * M_PI * M_PI, filename, "power spectrum of B", a, sim.z_pk[pkcount]);
 #endif
 	}
+	
+#ifdef VELOCITY
+	if (sim.out_pk & MASK_VEL)
+	{
+		plan_vi->execute(FFT_FORWARD);
+		extractPowerSpectrum(*viFT, kbin, power, kscatter, pscatter, occupation, sim.numbins, false, KTYPE_LINEAR);
+		sprintf(filename, "%s%s%03d_v.dat", sim.output_path, sim.basename_pk, pkcount);
+		writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI, filename, "power spectrum of velocity", a, sim.z_pk[pkcount]);
+		
+		projectFTtheta(*scalarFT, *viFT);
+		extractPowerSpectrum(*scalarFT, kbin, power, kscatter, pscatter, occupation, sim.numbins, false, KTYPE_LINEAR);
+		sprintf(filename, "%s%s%03d_theta.dat", sim.output_path, sim.basename_pk, pkcount);
+		writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI * sim.boxsize * sim.boxsize / cosmo.h / cosmo.h, filename, "power spectrum of theta (div v)", a, sim.z_pk[pkcount]);
+		
+		projectFTomega(*viFT);
+		extractPowerSpectrum(*viFT, kbin, power, kscatter, pscatter, occupation, sim.numbins, false, KTYPE_LINEAR);
+		sprintf(filename, "%s%s%03d_omega.dat", sim.output_path, sim.basename_pk, pkcount);
+		writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI * sim.boxsize * sim.boxsize / cosmo.h / cosmo.h, filename, "power spectrum of omega (curl v)", a, sim.z_pk[pkcount]);
+	}
+#endif
 
 	free(kbin);
 	free(power);
