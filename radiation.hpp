@@ -1,12 +1,12 @@
 //////////////////////////
 // radiation.hpp
 //////////////////////////
-// 
+//
 // code components related to radiation and linear relativistic species
 //
 // Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London)
 //
-// Last modified: November 2019
+// Last modified: June 2018
 //
 //////////////////////////
 
@@ -24,10 +24,11 @@
 //   the contributions for the various species are included only until some
 //   individual redshift values are reached (after which no linear treatment
 //   is requested)
-// 
+//
 // Arguments:
 //   class_background  CLASS structure that contains the background
 //   class_perturbs    CLASS structure that contains the perturbations
+//   class_spectra     CLASS structure that contains the spectra
 //   source            reference to field that will contain the realization
 //   scalarFT          reference to Fourier image of that field
 //   plan_source       pointer to FFT planner
@@ -39,7 +40,7 @@
 //   coeff             multiplicative coefficient (default 1)
 //
 // Returns:
-// 
+//
 //////////////////////////
 
 void projection_T00_project(background & class_background, perturbs & class_perturbs, Field<Real> & source, Field<Cplx> & scalarFT, PlanFFT<Cplx> * plan_source, metadata & sim, icsettings & ic, cosmology & cosmo, const double fourpiG, double a, double coeff = 1.)
@@ -53,6 +54,13 @@ void projection_T00_project(background & class_background, perturbs & class_pert
 	double rescale, Omega_ncdm = 0., Omega_rad = 0., Omega_fld = 0.;
 	Site x(source.lattice());
 	rKSite kFT(scalarFT.lattice());
+	#ifdef HAVE_CLASS_BG
+	gsl_interp_accel * acc = gsl_interp_accel_alloc();
+	//Background variables EFTevolution //TODO_EB: add as many as necessary
+	gsl_spline * H_spline = NULL;
+	//TODO_EB:add BG functions here
+	loadBGFunctions(class_background, H_spline, "H [1/Mpc]", sim.z_in);
+	#endif
 
 	if (a < 1. / (sim.z_switch_deltarad + 1.) && cosmo.Omega_g > 0 && sim.radiation_flag == 1)
 	{
@@ -62,9 +70,12 @@ void projection_T00_project(background & class_background, perturbs & class_pert
 		n = tk1->size;
 		delta = (double *) malloc(n * sizeof(double));
 		k = (double *) malloc(n * sizeof(double));
-		
+
 		for (i = 0; i < n; i++)
 		{
+			// Here the delta is multiplied to cosmo.Omega_g since it is \delta \rho or T_0^0.
+			// It seems negative sign comes from the convention of  class to Gevolution?
+			// Why it is divided by a?
 			delta[i] = -tk1->y[i] * coeff * cosmo.Omega_g * M_PI * sqrt(Pk_primordial(tk1->x[i] * cosmo.h / sim.boxsize, ic) / tk1->x[i]) / tk1->x[i] / a;
 			k[i] = tk1->x[i];
 		}
@@ -100,31 +111,33 @@ void projection_T00_project(background & class_background, perturbs & class_pert
 		gsl_spline_free(tk2);
 	}
 
-	if (a < 1. && cosmo.Omega_fld > 0 && sim.fluid_flag == 1)
+	if (a < 1. && cosmo.Omega_kessence > 0 && sim.fluid_flag == 1)
 	{
-		loadTransferFunctions(class_background, class_perturbs, tk1, tk2, "fld", sim.boxsize, (1. / a) - 1., cosmo.h);
-		Omega_fld = cosmo.Omega_fld / pow(a, 3. * cosmo.w0_fld);
-
-		if (delta == NULL)
-		{
-			n = tk1->size;
-			delta = (double *) malloc(n * sizeof(double));
-			k = (double *) malloc(n * sizeof(double));
-
-			for (i = 0; i < n; i++)
-			{
-				delta[i] = -tk1->y[i] * coeff * Omega_fld * M_PI * sqrt(Pk_primordial(tk1->x[i] * cosmo.h / sim.boxsize, ic) / tk1->x[i]) / tk1->x[i];
-				k[i] = tk1->x[i];
-			}
-		}
-		else
-		{
-			for (i = 0; i < n; i++)
-				delta[i] -= tk1->y[i] * coeff * Omega_fld * M_PI * sqrt(Pk_primordial(tk1->x[i] * cosmo.h / sim.boxsize, ic) / tk1->x[i]) / tk1->x[i];
-		}
-
-		gsl_spline_free(tk1);
-		gsl_spline_free(tk2);
+    cout<<"ERROR: You cannot ask for class dark energy perturbations in k-evolution!";
+    parallel.abortForce();
+		// loadTransferFunctions(class_background, class_perturbs, class_spectra, tk1, tk2, "fld", sim.boxsize, (1. / a) - 1., cosmo.h);
+		// Omega_fld = cosmo.Omega_fld / pow(a, 3. * cosmo.w0_fld);
+    //
+		// if (delta == NULL)
+		// {
+		// 	n = tk1->size;
+		// 	delta = (double *) malloc(n * sizeof(double));
+		// 	k = (double *) malloc(n * sizeof(double));
+    //
+		// 	for (i = 0; i < n; i++)
+		// 	{
+		// 		delta[i] = -tk1->y[i] * coeff * Omega_fld * M_PI * sqrt(Pk_primordial(tk1->x[i] * cosmo.h / sim.boxsize, ic) / tk1->x[i]) / tk1->x[i];
+		// 		k[i] = tk1->x[i];
+		// 	}
+		// }
+		// else
+		// {
+		// 	for (i = 0; i < n; i++)
+		// 		delta[i] -= tk1->y[i] * coeff * Omega_fld * M_PI * sqrt(Pk_primordial(tk1->x[i] * cosmo.h / sim.boxsize, ic) / tk1->x[i]) / tk1->x[i];
+		// }
+    //
+		// gsl_spline_free(tk1);
+		// gsl_spline_free(tk2);
 	}
 
 	for (p = 0; p < cosmo.num_ncdm; p++)
@@ -164,17 +177,23 @@ void projection_T00_project(background & class_background, perturbs & class_pert
 		if (sim.gr_flag == 0) // add gauge correction for N-body gauge
 		{
 			loadTransferFunctions(class_background, class_perturbs, tk1, tk2, "tot", sim.boxsize, (1. / a) - 1., cosmo.h);
-			rescale = Hconf(a, fourpiG, cosmo);
+			rescale = Hconf(a, fourpiG,//TODO_EB
+				#ifdef HAVE_CLASS_BG
+					H_spline, acc
+				#else
+					cosmo
+				#endif
+				);
 
 			for (i = 0; i < n; i++)
-				delta[i] -= coeff * (4. * Omega_rad / a + 3. * Omega_ncdm + 3. * (1. + cosmo.w0_fld) * Omega_fld) * rescale * M_PI * tk2->y[i] * sqrt(Pk_primordial(tk2->x[i] * cosmo.h / sim.boxsize, ic) / tk2->x[i]) / tk2->x[i] / tk2->x[i] / tk2->x[i];
+				delta[i] -= coeff * (4. * Omega_rad / a + 3. * Omega_ncdm + 3. * (1. + cosmo.w_kessence) * Omega_fld) * rescale * M_PI * tk2->y[i] * sqrt(Pk_primordial(tk2->x[i] * cosmo.h / sim.boxsize, ic) / tk2->x[i]) / tk2->x[i] / tk2->x[i] / tk2->x[i];
 
 			gsl_spline_free(tk1);
 			gsl_spline_free(tk2);
 		}
 
 		tk1 = gsl_spline_alloc(gsl_interp_cspline, n);
-		gsl_spline_init(tk1, k, delta, n);		
+		gsl_spline_init(tk1, k, delta, n);
 
 		generateRealization(scalarFT, 0., tk1, (unsigned int) ic.seed, ic.flags & ICFLAG_KSPHERE);
 		plan_source->execute(FFT_BACKWARD);
@@ -195,10 +214,11 @@ void projection_T00_project(background & class_background, perturbs & class_pert
 // Description:
 //   provides a (Fourier-space) realization of chi (generated by radiation and
 //   non-cold species) from the linear transfer functions precomputed with CLASS
-// 
+//
 // Arguments:
 //   class_background  CLASS structure that contains the background
 //   class_perturbs    CLASS structure that contains the perturbations
+//   class_spectra     CLASS structure that contains the spectra
 //   scalarFT          reference to Fourier image of field; will contain the
 //                     (Fourier image) of the realization
 //   sim               simulation metadata structure
@@ -209,7 +229,7 @@ void projection_T00_project(background & class_background, perturbs & class_pert
 //   coeff             multiplicative coefficient (default 1)
 //
 // Returns:
-// 
+//
 //////////////////////////
 
 void prepareFTchiLinear(background & class_background, perturbs & class_perturbs, Field<Cplx> & scalarFT, metadata & sim, icsettings & ic, cosmology & cosmo, const double fourpiG, double a, double coeff = 1.)
@@ -219,6 +239,13 @@ void prepareFTchiLinear(background & class_background, perturbs & class_perturbs
 	double * chi = NULL;
 	int i;
 	rKSite k(scalarFT.lattice());
+	#ifdef HAVE_CLASS_BG
+	gsl_interp_accel * acc = gsl_interp_accel_alloc();
+	//Background variables EFTevolution //TODO_EB: add as many as necessary
+	gsl_spline * H_spline = NULL;
+	//TODO_EB:add BG functions here
+	loadBGFunctions(class_background, H_spline, "H [1/Mpc]", sim.z_in);
+	#endif
 
 	loadTransferFunctions(class_background, class_perturbs, tk1, tk2, NULL, sim.boxsize, (1. / a) - 1., cosmo.h);
 
@@ -234,11 +261,41 @@ void prepareFTchiLinear(background & class_background, perturbs & class_perturbs
 		double * l3 = (double *) malloc(tk1->size * sizeof(double));
 		double * l4 = (double *) malloc(tk1->size * sizeof(double));
 		double * l5 = (double *) malloc(tk1->size * sizeof(double));
-		double Hconf1 = Hconf(0.99 * a, fourpiG, cosmo);
-		double Hconf2 = Hconf(0.995 * a, fourpiG, cosmo);
-		double Hconf3 = Hconf(a, fourpiG, cosmo);
-		double Hconf4 = Hconf(1.005 * a, fourpiG, cosmo);
-		double Hconf5 = Hconf(1.01 * a, fourpiG, cosmo);
+		double Hconf1 = Hconf(0.99 * a, fourpiG,//TODO_EB
+			#ifdef HAVE_CLASS_BG
+				H_spline, acc
+			#else
+				cosmo
+			#endif
+			);
+		double Hconf2 = Hconf(0.995 * a, fourpiG,//TODO_EB
+			#ifdef HAVE_CLASS_BG
+				H_spline, acc
+			#else
+				cosmo
+			#endif
+			);
+		double Hconf3 = Hconf(a, fourpiG,//TODO_EB
+			#ifdef HAVE_CLASS_BG
+				H_spline, acc
+			#else
+				cosmo
+			#endif
+			);
+		double Hconf4 = Hconf(1.005 * a, fourpiG,//TODO_EB
+			#ifdef HAVE_CLASS_BG
+				H_spline, acc
+			#else
+				cosmo
+			#endif
+			);
+		double Hconf5 = Hconf(1.01 * a, fourpiG,//TODO_EB
+			#ifdef HAVE_CLASS_BG
+				H_spline, acc
+			#else
+				cosmo
+			#endif
+			);
 
 		for (i = 0; i < tk1->size; i++)
 			l3[i] = -tk1->y[i];
@@ -340,4 +397,3 @@ void prepareFTchiLinear(background & class_background, perturbs & class_perturbs
 #endif
 
 #endif
-

@@ -1,7 +1,7 @@
 //////////////////////////
 // metadata.hpp
 //////////////////////////
-// 
+//
 // Constants and metadata structures
 //
 // Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London)
@@ -63,8 +63,15 @@
 #define MASK_XSPEC  2048
 #define MASK_DELTA  4096
 #define MASK_DBARE  8192
-#define MASK_MULTI  16384
-#define MASK_VEL    32768
+#define MASK_PI_K    16384
+#define MASK_zeta    32768
+#define MASK_MULTI  65536
+#define MASK_VEL    131072
+#define MASK_T_KESS 262144
+#define MASK_Delta_KESS 524288
+#define MASK_PHI_PRIME 1048576
+#define MASK_DELTAKESS_DELTA 2097152
+
 
 #define ICFLAG_CORRECT_DISPLACEMENT 1
 #define ICFLAG_KSPHERE              2
@@ -132,12 +139,12 @@
 #define COLORTEXT_YELLOW    "\033[33;1m"
 #define COLORTEXT_RESET     "\033[0m"
 #else
-#define COLORTEXT_WHITE     ""
-#define COLORTEXT_CYAN      ""
-#define COLORTEXT_GREEN     ""
-#define COLORTEXT_RED       ""
-#define COLORTEXT_YELLOW    ""
-#define COLORTEXT_RESET     ""
+#define COLORTEXT_WHITE     '\0'
+#define COLORTEXT_CYAN      '\0'
+#define COLORTEXT_GREEN     '\0'
+#define COLORTEXT_RED       '\0'
+#define COLORTEXT_YELLOW    '\0'
+#define COLORTEXT_RESET     '\0'
 #endif
 
 // header structure for GADGET-2 files [V. Springel, N. Yoshida, and S.D. White, New Astron. 6 (2001) 79
@@ -206,10 +213,12 @@ struct metadata
 	int gr_flag;
 	int vector_flag;
 	int radiation_flag;
-	int fluid_flag;
+	int fluid_flag=0;
 	int out_pk;
 	int out_snapshot;
 	int out_lightcone[MAX_OUTPUTS];
+  //Kessence
+  int num_snapshot_kess;
 	int num_pk;
 	int numbins;
 	int num_snapshot;
@@ -240,6 +249,11 @@ struct metadata
 	char output_path[PARAM_MAX_LENGTH];
 	char restart_path[PARAM_MAX_LENGTH];
 	char basename_restart[PARAM_MAX_LENGTH];
+	//Kessence part
+	int nKe_numsteps;
+	int Kess_source_gravity;
+  int NL_kessence;
+	//kessence end
 };
 
 struct icsettings
@@ -249,9 +263,13 @@ struct icsettings
 	int flags;
 	int generator;
 	int restart_cycle;
+  int IC_kess ; // Initial conditions for kessence fields (pi,zeta); 0 is from CLASS and 1 is provided by hand
 	char pclfile[MAX_PCL_SPECIES][PARAM_MAX_LENGTH];
 	char pkfile[PARAM_MAX_LENGTH];
 	char tkfile[PARAM_MAX_LENGTH];
+	//Kessence
+	char tk_kessence[PARAM_MAX_LENGTH];
+	//kessence end
 	char metricfile[3][PARAM_MAX_LENGTH];
 	double restart_tau;
 	double restart_dtau;
@@ -262,6 +280,7 @@ struct icsettings
 	double A_s;
 	double n_s;
 	double k_pivot;
+
 };
 
 struct cosmology
@@ -270,10 +289,24 @@ struct cosmology
 	double Omega_b;
 	double Omega_m;
 	double Omega_Lambda;
-	double Omega_fld;
-	double w0_fld;
-	double wa_fld;
-	double cs2_fld;
+  // kessence theory
+  double MGtheory;
+ 	// Kessence EFT
+	double Omega_kessence;
+  double w_kessence;
+	double cs2_kessence;
+  // Fundamental k-essence
+  double X_hat;
+  double g0;
+  double g2;
+  double g4;
+  //
+  // fld CLASS
+  // double Omega_fld=0.0;
+	// double w0_fld=0.0;
+	// double wa_fld=0.0;
+	// double cs2_fld=1.0;
+	//kessence end
 	double Omega_g;
 	double Omega_ur;
 	double Omega_rad;

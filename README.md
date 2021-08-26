@@ -1,25 +1,10 @@
-# gevolution-1.2
+# k-evolution
 
-Copyright (c) 2015-2020 Julian Adamek
-(Université de Genève & Observatoire de Paris & Queen Mary University of London)
+k-evolution (arXiv:1910.01104) is basen on gevolution N-body code (Adamek J., Daverio D., Durrer R., and Kunz M., Nature Phys. 12, 346 (2016), arXiv: 1604.06065).
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+k-essene based the EFT framework is added into the gevolution
+The free parameters to be chosen are w (the equation of state for dark energy) and c_s^2 (the speed of sound squared). 
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-  
-**The Software is provided "as is", without warranty of any kind, expressed or
-implied, including but not limited to the warranties of merchantability,
-fitness for a particular purpose and noninfringement. In no event shall the
-authors or copyright holders be liable for any claim, damages or other
-liability, whether in an action of contract, tort or otherwise, arising from,
-out of or in connection with the Software or the use or other dealings in the
-Software.**
 
 ## Compilation and usage
 
@@ -41,7 +26,7 @@ A typical command to run a simulation looks like this:
 
     mpirun -np 16 ./gevolution -n 4 -m 4 -s settings.ini
 
-For further information, please refer to the User Manual (manual.pdf)
+For further about gevolution information, please refer to the User Manual (manual.pdf)
 
 ## Credits
 
