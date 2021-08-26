@@ -1,3 +1,12 @@
 
 Mathematica/.DS_Store
 .DS_Store
+.DS_Store
+*.dat
+*.h5
+*.h5
+output/lcdm_snap001_cdm
+output/lcdm_snap001_cdm
+output/lcdm_snap002_cdm
+output/lcdm_snap000_cdm
+Mathematica/xSVT/.DS_Store
