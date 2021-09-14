@@ -1,1 +1,2 @@
 Mathematica/xSVT/get_eqs_ST.nb filter=lfs diff=lfs merge=lfs -text
+Mathematica/xSVT_KGB/get_eqs_ST* filter=lfs diff=lfs merge=lfs -text
