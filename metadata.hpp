@@ -263,7 +263,7 @@ struct icsettings
 	int flags;
 	int generator;
 	int restart_cycle;
-  int IC_kess ; // Initial conditions for kessence fields (pi,zeta); 0 is from CLASS and 1 is provided by hand
+  int IC_MG ; // Initial conditions for kessence fields (pi,zeta); 0 is from CLASS and 1 is provided by hand
 	char pclfile[MAX_PCL_SPECIES][PARAM_MAX_LENGTH];
 	char pkfile[PARAM_MAX_LENGTH];
 	char tkfile[PARAM_MAX_LENGTH];
@@ -289,8 +289,9 @@ struct cosmology
 	double Omega_b;
 	double Omega_m;
 	double Omega_Lambda;
-  // kessence theory
-  double MGtheory;
+
+  int kessence_theory; // 0 means no EFt of kessence, 1 means k-essence covariant equation
+
  	// Kessence EFT
 	double Omega_kessence;
   double w_kessence;
@@ -300,12 +301,22 @@ struct cosmology
   double g0;
   double g2;
   double g4;
-  //
+
+  // EFT parameters
+  int MG_theory; // 0 means no MG, 1 is EFT and 2 is k-essence //Todo is ... (will be added)
+  int MG_treatment; // 0 means hiclass-interface 1 is being solved here
+  int gravity_model; // 0 means gravity_model = propto_omega
+  double x_i[5];
+  double x_k;
+  double x_b;
+  double x_m;
+  double x_t;
+  double M_star_ini;
   // fld CLASS
-  // double Omega_fld=0.0;
-	// double w0_fld=0.0;
-	// double wa_fld=0.0;
-	// double cs2_fld=1.0;
+  double Omega_fld=0.0;
+	double w0_fld=0.0;
+	double wa_fld=0.0;
+	double cs2_fld=1.0;
 	//kessence end
 	double Omega_g;
 	double Omega_ur;

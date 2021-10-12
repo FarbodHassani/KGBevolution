@@ -48,6 +48,7 @@
 #include "LATfield2.hpp"
 #include "metadata.hpp"
 #include "class_tools.hpp"
+// #include "hiclass_tools.hpp"
 #include "tools.hpp"
 #include "background.hpp"
 #include "Particles_gevolution.hpp"
@@ -640,6 +641,7 @@ string str_filename5 ;
 	while (true)    // main loop
 	{
     //Kessence
+    #ifdef BACKREACTION_TEST
   	for (x.first(); x.test(); x.next())
   		{
         // cout<<"tau: "<<tau<<" z: "<<1./(a) -1.<<endl;
@@ -650,7 +652,6 @@ string str_filename5 ;
         pi_k_old(x) = pi_k(x);
         det_gamma_old (x) = det_gamma(x);
   		}
-#ifdef BACKREACTION_TEST
       //****************************
       //****PRINTING AVERAGE OVER TIME
       //****************************
@@ -1224,12 +1225,12 @@ ref_time = MPI_Wtime();
 
  //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)
  // EFT of k-essence theory
- if (cosmo.MGtheory == 0)
+ //gravity theory = EFT &&  MG treatment   != hiclass
+ if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 1  )
  {
-
    if(cycle==0)
    {
-   if(parallel.isRoot())  cout << "\033[1;34mThe EFT approach equations are being solved!\033[0m\n";
+   if(parallel.isRoot())  cout << "\033[1;34mThe EFT approach equations including the MG part are being solved in k-evolution!\033[0m\n";
    }
    //**********************
    //Kessence - LeapFrog:START
@@ -1413,9 +1414,9 @@ ref_time = MPI_Wtime();
 
  }
 
-
+  #ifdef BACKREACTION_TEST
     // Fundamental k-essence theory  cosmo.MGtheory == 1
-    if (cosmo.MGtheory == 1)
+    if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 2 )
     {
       double a_kess=a;
       if(cycle==0)
@@ -1451,7 +1452,7 @@ ref_time = MPI_Wtime();
         cosmo,
       #endif
       dtau  / sim.nKe_numsteps / 2.0);
-      #ifdef BACKREACTION_TEST
+
       //   //Make snapshots and power arround blowup TIME
       // // max_zeta =maximum(  zeta_half, Hconf(a, fourpiG, cosmo), numpts3d ) ;
       // max_zeta_old =maximum(  zeta_half_old, Hconf(a, fourpiG, cosmo), numpts3d ) ;
@@ -1528,11 +1529,11 @@ ref_time = MPI_Wtime();
         ) <<"\t"<< setw(9) <<snapcount_b <<"\t"<< setw(9) << avg_cs2_full <<endl;
           }
 
-    #endif
+
 
     // Fundamental k-essence theory  END
     }
-
+    #endif
 
 #ifdef BENCHMARK
     kessence_update_time += MPI_Wtime() - ref_time;

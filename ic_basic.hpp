@@ -1907,7 +1907,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	ic_fields[0] = chi;
 	ic_fields[1] = phi;
 
-  if (ic.tkfile[0] != '\0' && ic.IC_kess == 0)
+  if (ic.tkfile[0] != '\0' && ic.IC_MG == 0)
   {
     if(parallel.isRoot())  cout << " \033[1;31merror:\033[0m"<< " \033[1;31mYou requested CLASS to compute initial conditions while provided a file!\033[0m" << endl;
     parallel.abortForce();
@@ -2070,7 +2070,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	// 	double * k_ess = NULL;
 	// 	int npts=0;
   //   #ifdef HAVE_CLASS
-  //   if (ic.IC_kess == 0)
+  //   if (ic.IC_MG == 0)
   //   {
   //   if (ic.tkfile[0] == '\0')
   //   {
@@ -2121,7 +2121,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
   //   free(k_ess);
   //   }
   //   if(parallel.isRoot())  cout << "The initial condition for k-essence fileds (pi,zeta) are computed using CLASS" <<endl;
-  //   if (ic.IC_kess == 1)
+  //   if (ic.IC_MG == 1)
   //   {
   //     if(parallel.isRoot())  cout << " \033[1;31merror:\033[0m"<< " \033[1;31merror: CLASS is linked while the initial conditions for k-essence are supposed to be provided by the file!\033[0m" << endl;
   //     parallel.abortForce();
@@ -2129,7 +2129,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
   // }
   //   #endif
   //     // If you want to provide the IC yourself!
-  //   if (ic.IC_kess == 1)
+  //   if (ic.IC_MG == 1)
   //     {
   //     if(parallel.isRoot())  cout << " \033[1;31mCAREFUL:\033[0m"  << "\033[1;35mBe careful about the initial conditions for kessence fields! It's safer to use CLASS\033[0m" <<endl;
   //     loadTransferFunctions_kessence(ic.tk_kessence, tk_d_kess, tk_t_kess, "kess", sim.boxsize, cosmo.h, Hc, Hconf_class( a, cosmo));	// get transfer functions for k_essence
@@ -2186,6 +2186,9 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
     //////////////////////////////////////////////////////
 		////K_essence IC part////// field from hiclass
 		//////////////////////////////////////////////////////
+  if ( cosmo.MG_theory == 2 && cosmo.kessence_theory == 1)
+  {
+
     #ifdef HAVE_CLASS
     gsl_spline * tk_d_kess = NULL;
     gsl_spline * tk_t_kess = NULL;
@@ -2193,7 +2196,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
     double * kess_field_prime = NULL;
     double * k_ess = NULL;
     int npts=0;
-    if (ic.IC_kess == 0)
+    if (ic.IC_MG == 0)
     {
     if (ic.tkfile[0] == '\0')
     {
@@ -2253,7 +2256,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
     free(k_ess);
     }
     if(parallel.isRoot())  cout << "The initial condition for k-essence fileds (pi,zeta) are computed using CLASS" <<endl;
-    if (ic.IC_kess == 1)
+    if ( ic.IC_MG == 1)
     {
       if(parallel.isRoot())  cout << " \033[1;31merror:\033[0m"<< " \033[1;31merror: CLASS is linked while the initial conditions for k-essence are supposed to be provided by the file!\033[0m" << endl;
       parallel.abortForce();
@@ -2261,7 +2264,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
   }
     #endif
       // If you want to provide the IC yourself!
-    if (ic.IC_kess == 1)
+    if (ic.IC_MG == 1)
       {
       if(parallel.isRoot())  cout << " \033[1;31mCAREFUL:\033[0m"  << "\033[1;35mBe careful about the initial conditions for kessence fields! It's safer to use CLASS\033[0m" <<endl;
       loadTransferFunctions_kessence(ic.tk_kessence, tk_d_kess, tk_t_kess, "kess", sim.boxsize, cosmo.h, Hc, Hconf_class( a, cosmo));	// get transfer functions for k_essence
@@ -2308,7 +2311,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
       gsl_spline_free(tk_t_kess);
       free(k_ess);
       }
-
+    }
 		//////////////////////////////////////////////////////
 		//// End of K_essence IC part/
 		//////////////////////////////////////////////////////

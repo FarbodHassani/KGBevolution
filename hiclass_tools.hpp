@@ -57,7 +57,16 @@ void initializeCLASSstructures(metadata & sim, icsettings & ic, cosmology & cosm
 	double perturb_sampling_stepsize;
 	int recfast_Nz0;
 	int i;
-	int num_entries = 26;
+  int num_entries;
+  if (cosmo.MG_theory == 1)
+  {
+    num_entries = 30; // If we have EFT theory we have to read 30 class params
+  }
+  else
+  {
+    num_entries = 24;
+  }
+
 #ifdef CLASS_K_PER_DECADE_FOR_PK
 	int k_per_decade_for_pk;
 	if (numparam == 0 || !parseParameter(params, numparam, "k_per_decade_for_pk", k_per_decade_for_pk))
@@ -161,10 +170,24 @@ void initializeCLASSstructures(metadata & sim, icsettings & ic, cosmology & cosm
 	sprintf(class_filecontent.name[i], "N_ncdm");
 	sprintf(class_filecontent.value[i++], "%d", cosmo.num_ncdm);
 
+  sprintf(class_filecontent.name[i], "write parameters");
+  sprintf(class_filecontent.value[i++], "yeap");
+
+  sprintf(class_filecontent.name[i], "write background");
+  sprintf(class_filecontent.value[i++], "yes");
+
+  sprintf(class_filecontent.name[i], "format");
+  sprintf(class_filecontent.value[i++], "class");
+
+  sprintf(class_filecontent.name[i], "headers");
+  sprintf(class_filecontent.value[i++], "yes");
+
 	sprintf(class_filecontent.name[i], "perturb_sampling_stepsize");
 	sprintf(class_filecontent.value[i++], "%g", perturb_sampling_stepsize);
 
 // EFT
+if (cosmo.MG_theory == 1)
+{
   sprintf(class_filecontent.name[i], "Omega_Lambda");
   sprintf(class_filecontent.value[i++], "%d", 0);
 
@@ -175,13 +198,15 @@ void initializeCLASSstructures(metadata & sim, icsettings & ic, cosmology & cosm
   sprintf(class_filecontent.value[i++], "propto_omega");
   //
   sprintf(class_filecontent.name[i], "parameters_smg");
-  sprintf(class_filecontent.value[i++],"%e, %e, %e, %e, %e",-EFT.x_k, EFT.x_b, EFT.x_m, EFT.x_t, EFT.M_star_ini);
+  sprintf(class_filecontent.value[i++],"%e, %e, %e, %e, %e",cosmo.x_k, cosmo.x_b, cosmo.x_m, cosmo.x_t, cosmo.M_star_ini);
 
   sprintf(class_filecontent.name[i], "tuning_dxdy_guess_smg");
   sprintf(class_filecontent.value[i++], "%d", 1);
 
   sprintf(class_filecontent.name[i], "tuning_index_smg");
   sprintf(class_filecontent.value[i++], "%d", 1);
+
+}
 
 #ifdef CLASS_K_PER_DECADE_FOR_PK
 	sprintf(class_filecontent.name[i], "k_per_decade_for_pk");
