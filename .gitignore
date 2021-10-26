@@ -21,3 +21,6 @@ output/lcdm_lightcone1_info.bin
 output/lcdm_snap003_cdm
 .DS_Store
 gevolution
+.DS_Store
+output/EFT_classparameters.ini
+output/EFT_classunused_parameters

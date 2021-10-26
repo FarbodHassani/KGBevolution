@@ -795,7 +795,7 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
 	ic.pkfile[0] = '\0';
 	ic.tkfile[0] = '\0';
 	//kessence part
-  ic.IC_MG = 0;
+  ic.IC_MG = 1;
 	ic.tk_kessence[0]='\0';
 	//kessence end
 	ic.metricfile[0][0] = '\0';
@@ -822,10 +822,15 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
       ic.IC_MG = 1;
       COUT<<"The IC for the fields including v_x_smg is set using hiclass"<<endl;
     }
+    else if (par_string[0] == 'f' || par_string[0] == 'F')
+    {
+      ic.IC_MG = 0;
+      COUT<<"The IC for the fields including v_x_smg is set using a file!"<<endl;
+    }
     else
     {
       ic.IC_MG = 1;
-      COUT<<"NO IC for the fields iare defined, the default (hiclass) being used!"<<endl;
+      COUT<<"NO IC for the fields are defined, the default (hiclass) being used!"<<endl;
     }
   }
 
@@ -1711,7 +1716,7 @@ if (cosmo.MG_theory != 0)
   }
 }
 
-if (cosmo.MG_theory == 1)
+if (cosmo.MG_theory == 1) // EFT MG gravity
 {
   if (parseParameter(params, numparam, "gravity_model", par_string))
   {
@@ -1730,7 +1735,7 @@ if (cosmo.MG_theory == 1)
     }
   }
 }
-  if (cosmo.MG_theory == 1)
+  if (cosmo.MG_theory == 1) // EFT MG gravity
   {
     int num_alpha_params = 5;
     if(parseParameter(params, numparam, "parameters_smg", cosmo.x_i, num_alpha_params))
@@ -1738,6 +1743,15 @@ if (cosmo.MG_theory == 1)
       cosmo.x_k = cosmo.x_i[0];
       cosmo.x_b = cosmo.x_i[1];
       COUT<<"The EFT parameters are: "<<"\033[1;32m alpha_k= \033[0m" << cosmo.x_k <<"\033[1;32m, alpha_B= \033[0m" << cosmo.x_b <<"\033[1;32m, alpha_M= \033[0m" << cosmo.x_i[2] <<"\033[1;32m, alpha_t= \033[0m" << cosmo.x_i[3]<<"\033[1;32m, M= \033[0m" << cosmo.x_i[4]<<endl;
+    }
+    int num_bg_params = 3;
+    if(parseParameter(params, numparam, "expansion_smg", cosmo.bg_i, num_alpha_params))
+    {
+      cosmo.Omega_mg = cosmo.bg_i[0];
+      cosmo.w0_mg = cosmo.bg_i[1];
+      cosmo.wa_mg = cosmo.bg_i[2];
+
+      COUT<<"The expansion parameters are: "<<"\033[1;32m Omega_smg= \033[0m" << cosmo.Omega_mg <<"\033[1;32m, w0_smg= \033[0m" << cosmo.w0_mg <<"\033[1;32m, wa_smg= \033[0m" << cosmo.wa_mg <<endl;
     }
   }
   //EFTevolution end

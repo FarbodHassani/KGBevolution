@@ -47,8 +47,12 @@
 #endif
 #include "LATfield2.hpp"
 #include "metadata.hpp"
-#include "class_tools.hpp"
-// #include "hiclass_tools.hpp"
+//
+// #ifdef HAVE_CLASS_BG
+#include "hiclass_tools.hpp"
+// #else
+// #include "class_tools.hpp"
+// #endif
 #include "tools.hpp"
 #include "background.hpp"
 #include "Particles_gevolution.hpp"
@@ -220,7 +224,6 @@ int main(int argc, char **argv)
 	else
 #endif
 		numparam = 0;
-
 #ifdef HAVE_CLASS_BG
   //TODO_EB:add BG functions here
   initializeCLASSstructures(sim, ic, cosmo, class_background, class_thermo, class_perturbs, params, numparam);
@@ -458,7 +461,6 @@ int main(int argc, char **argv)
 
 
 	dtau_old = 0.;
-
 	if (ic.generator == ICGEN_BASIC)
 		generateIC_basic(sim, ic, cosmo, fourpiG, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &pi_k, &zeta_half, &chi, &Bi, &source, &Sij, &scalarFT, &scalarFT_pi, &scalarFT_zeta_half, &BiFT, &SijFT, &plan_phi, &plan_pi_k, &plan_zeta_half, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, params, numparam);
 	// generates ICs on the fly
@@ -477,7 +479,6 @@ int main(int argc, char **argv)
 		COUT << " error: IC generator not implemented!" << endl;
 		parallel.abortForce();
 	}
-
 	if (sim.baryon_flag > 1)
 	{
 		COUT << " error: baryon_flag > 1 after IC generation, something went wrong in IC generator!" << endl;
@@ -635,7 +636,6 @@ string str_filename3 ;
 string str_filename4 ;
 string str_filename5 ;
 #endif
-
 
 
 	while (true)    // main loop
