@@ -944,8 +944,16 @@ string str_filename5 ;
 		// record some background data
 		if (kFT.setCoord(0, 0, 0))
 		{
+      if (cycle == 0)
+      {
+        sprintf(filename, "%s%s_background.dat", sim.output_path, sim.basename_generic);
+        outfile = fopen(filename, "w");
+      }
+      else
+      {
 			sprintf(filename, "%s%s_background.dat", sim.output_path, sim.basename_generic);
 			outfile = fopen(filename, "a");
+      }
 			if (outfile == NULL)
 			{
 				cout << " error opening file for background output!" << endl;

@@ -2047,7 +2047,9 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 			plan_pi_k->execute(FFT_FORWARD);
 			extractPowerSpectrum(*scalarFT_pi , kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);
 			sprintf(filename, "%s%s%03d_pi_k.dat", sim.output_path, sim.basename_pk, pkcount);
-			writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI, filename, "power spectrum of pi_k  (dimensionless)", a, sim.z_pk[pkcount]);
+      writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI, filename, "power spectrum of pi_k * H0  (dimensionless)", a, sim.z_pk[pkcount]);
+
+			// writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI/sqrt(2./3.*fourpiG)/sqrt(2./3.*fourpiG), filename, "power spectrum of pi_k * H0  (dimensionless)", a, sim.z_pk[pkcount]);
 		}
 
 	     if (sim.out_pk & MASK_zeta)
