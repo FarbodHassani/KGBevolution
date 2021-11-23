@@ -127,7 +127,11 @@ int main(int argc, char **argv)
 	gsl_interp_accel * acc = gsl_interp_accel_alloc();
 	//Background variables EFTevolution //TODO_EB: add as many as necessary
 	gsl_spline * H_spline = NULL;
-	gsl_spline * cs2_spline = NULL;
+  gsl_spline * cs2_spline = NULL;
+	gsl_spline * alpha_K = NULL;
+  gsl_spline * alpha_B = NULL;
+  gsl_spline * alpha_K_prime = NULL;
+  gsl_spline * alpha_B_prime = NULL;
 	gsl_spline * rho_smg_spline = NULL;
 	gsl_spline * p_smg_spline = NULL;
 	gsl_spline * rho_crit_spline = NULL;
@@ -229,9 +233,12 @@ int main(int argc, char **argv)
   initializeCLASSstructures(sim, ic, cosmo, class_background, class_thermo, class_perturbs, params, numparam);
   loadBGFunctions(class_background, H_spline, "H [1/Mpc]", sim.z_in);
   loadBGFunctions(class_background, cs2_spline, "c_s^2", sim.z_in);
-  // loadBGFunctions(class_background, cs2_spline, "c_s^2", sim.z_in); //TODO: FH
   loadBGFunctions(class_background, rho_smg_spline, "(.)rho_smg", sim.z_in);
   loadBGFunctions(class_background, p_smg_spline, "(.)p_smg", sim.z_in);
+  loadBGFunctions(class_background, alpha_K, "kineticity_smg", sim.z_in);
+  loadBGFunctions(class_background, alpha_B, "braiding_smg", sim.z_in);
+  loadBGFunctions(class_background, alpha_K_prime, "kineticity_prime_smg", sim.z_in);
+  loadBGFunctions(class_background, alpha_B_prime, "braiding_prime_smg", sim.z_in);
   loadBGFunctions(class_background, rho_crit_spline, "(.)rho_crit", sim.z_in);
 #endif
 
@@ -1229,16 +1236,132 @@ ref_time = MPI_Wtime();
 		ref_time = MPI_Wtime();
 #endif
 
-        // We just need to update halo when we want to calculate spatial derivative or use some neibours at the same time! So here wo do not nee to update halo for phi_prime!
+
+//Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)
+// EFT of k-essence theory
+//gravity theory = EFT &&  MG treatment   != hiclass
+if (cosmo.MG_theory == 1 && cosmo.kessence_theory == 0 && cosmo.MG_treatment==1  )
+{
+  if(cycle==0)
+  {
+  if(parallel.isRoot())  cout << "\033[1;34m The EFT approach equations including the MG part are being solved!\033[0m\n";
+  }
+  //**********************
+  //Kessence - LeapFrog:START
+  //**********************
+    double a_kess=a;
+    //First we update zeta_half to have it at -1/2 just in the first loop
+    if(cycle==0)
+    {
+      for (i=0;i<sim.nKe_numsteps;i++)
+      {
+       update_pi_prime_EFT(-dtau/ (2. * sim.nKe_numsteps), dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), fourpiG, gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
+       zeta_half.updateHalo();
+      }
+    }
+
+   //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)
+   for (i=0;i<sim.nKe_numsteps;i++)
+   {
+      //********************************************************************************
+      //Updating zeta_integer to get zeta_integer(n+1/2) and zeta_integer(n+1), in the first loop is getting zeta_integer(1/2) and zeta_integer(1)
+      // In sum: zeta_integer(n+1/2) = zeta_integer(n-1/2)+ zeta_integer'(n)dtau which needs background to be at n with then
+      //Note that here for zeta_integer'(n) we need background to be at n and no need to update it.
+      //\zeta_integer(n+1/2) = \zeta_integer(n-1/2) + \zeta_integer'(n)  dtau
+      //We also update zeta_int from n to n+1
+      //********************************************************************************
+
+      update_pi_prime_EFT(dtau/ sim.nKe_numsteps, dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), fourpiG, gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
+      zeta_half.updateHalo();
+      //********************************************************************************
+      //Since we have pi(n+1)=pi(n) + pi'(n+1/2), and in pi'(n+1/2) we have H(n+1/2) we update the background before updating the pi to have H(n+1/2), Moreover zeta(n+1) = zeta(n+1/2) + zeta'(n+1/2), so we put zeta_int updating in the pi updating!
+      //********************************************************************************
+     rungekutta4bg(a_kess, fourpiG,
+       #ifdef HAVE_CLASS_BG
+         H_spline, acc,
+       #else
+         cosmo,
+       #endif
+       dtau  / sim.nKe_numsteps / 2.0);
+      //********************************************************************************
+      //we update pi to have it at n+1 (at first loop from the value at (0) and the value of zeta_integer at 1/2 and H(n+1/2) we update pi at (1))
+      //In the pi update we also update zeta_int because we need the values of a_kess and H_kess at step n+1/2
+      //By the below update we get pi(n+1) and zeta(n+1)
+      //********************************************************************************
+      update_pi_EFT(dtau/ sim.nKe_numsteps, pi_k, zeta_half);
+      pi_k.updateHalo();
+      //********************************************************************************
+      // Now we have pi(n+1) and a_kess(n+1/2) so we update background by halfstep to have a_kess(n+1)
+      //********************************************************************************
+     rungekutta4bg(a_kess, fourpiG,
+       #ifdef HAVE_CLASS_BG
+         H_spline, acc,
+       #else
+         cosmo,
+       #endif
+       dtau  / sim.nKe_numsteps / 2.0);
+      #ifdef BACKREACTION_TEST
+        avg_zeta =average(  zeta_half,1., numpts3d ) ;
+        // avg_zeta_old =average(  zeta_half_old,1., numpts3d ) ;
+        avg_pi =average(  pi_k,1., numpts3d ) ;
+        avg_phi =average(  phi , 1., numpts3d ) ;
+        avg_pi_old =average(  pi_k_old, 1., numpts3d ) ;
+
+        if (avg_zeta > 4.e-7 && abs(avg_pi/avg_pi_old)>1.015 && snapcount_b< sim.num_snapshot_kess )
+        {
+        if(parallel.isRoot())  cout << "\033[1;32mThe blowup criteria for EFT equations are met, the requested snapshots being produced\033[0m\n";
+          writeSpectra(sim, cosmo, fourpiG, a, snapcount_b,
+            #ifdef HAVE_CLASS
+                   class_background, class_perturbs, ic,
+            #endif
+                    &pcls_cdm, &pcls_b, pcls_ncdm, &phi,&pi_k, &zeta_half, &chi, &Bi,&T00_Kess, &T0i_Kess, &Tij_Kess, &source, &Sij, &scalarFT ,&scalarFT_pi, &scalarFT_zeta_half, &BiFT, &T00_KessFT, &T0i_KessFT, &Tij_KessFT, &SijFT, &plan_phi, &plan_pi_k, &plan_zeta_half, &plan_chi, &plan_Bi, &plan_T00_Kess, &plan_T0i_Kess, &plan_Tij_Kess, &plan_source, &plan_Sij);
+            str_filename =  "./output/pi_k_" + to_string(snapcount_b) + ".h5";
+            str_filename2 = "./output/zeta_" + to_string(snapcount_b) + ".h5";
+            str_filename3 = "./output/phi_" + to_string(snapcount_b) + ".h5";
+            pi_k.saveHDF5(str_filename);
+            zeta_half.saveHDF5(str_filename2);
+            phi.saveHDF5(str_filename3);
+            snapcount_b++;
+
+            out_snapshots<<setw(9) << tau + dtau/sim.nKe_numsteps <<"\t"<< setw(9) << 1./(a_kess) -1.0 <<"\t"<< setw(9) << a_kess <<"\t"<< setw(9) << avg_zeta <<"\t"<< setw(9) << avg_pi <<"\t"<< setw(9) << avg_phi <<"\t"<< setw(9) <<tau <<"\t"<< setw(9) << Hconf(a_kess, fourpiG,//TODO_EB
+           #ifdef HAVE_CLASS_BG
+             H_spline, acc
+           #else
+             cosmo
+           #endif
+         ) / Hconf(1., fourpiG,//TODO_EB
+           #ifdef HAVE_CLASS_BG
+             H_spline, acc
+           #else
+             cosmo
+           #endif
+           ) <<"\t"<< setw(9) <<snapcount_b  <<endl;
+          }
+
+      #endif
+      }
+
+
+  #ifdef BENCHMARK
+      kessence_update_time += MPI_Wtime() - ref_time;
+      ref_time = MPI_Wtime();
+  #endif
+  //**********************
+  //EFT evolution - LeapFrog: End
+  //**********************
+
+}
+
+
 
  //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)
- // EFT of k-essence theory
- //gravity theory = EFT &&  MG treatment   != hiclass
- if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 1  )
+ // k-essence theory
+ //gravity theory = k-essence &&  MG treatment   != hiclass
+ if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 2  )
  {
    if(cycle==0)
    {
-   if(parallel.isRoot())  cout << "\033[1;34mThe EFT approach equations including the MG part are being solved in k-evolution!\033[0m\n";
+   if(parallel.isRoot())  cout << "\033[1;34mThe k-essence - EFT approach equations including the MG part are being solved in k-evolution!\033[0m\n";
    }
    //**********************
    //Kessence - LeapFrog:START

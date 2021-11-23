@@ -93,10 +93,30 @@
 \color none
 \begin_inset Formula 
 \begin{align*}
-\alpha_{\textrm{K}}\mathcal{H}^{2}\xi^{\prime} & =-(\mathcal{H}^{2}\alpha_{K}{}^{\prime}+2\alpha_{\textrm{K}}\mathcal{H}\mathcal{H}^{\prime}+\alpha_{\textrm{K}}\mathcal{H}^{3})\xi+(-6\mathcal{H}^{4}-6\mathcal{H}^{\prime}{}^{2}+12\mathcal{H}^{2}\mathcal{H}^{\prime}+3\alpha_{\textrm{B}}\mathcal{H}\mathcal{H}^{\prime\prime}-3\mathcal{H}^{3}\alpha_{B}{}^{\prime}-9\mathcal{H}^{2}\mathcal{H}^{\prime}\alpha_{\textrm{B}}\\
- & +3\mathcal{H}\mathcal{H}^{\prime}\alpha_{B}{}^{\prime}+3\alpha_{\textrm{B}}\mathcal{H}^{\prime}{}^{2}+\frac{3(\rho_{m}+p_{m})a^{2}(\mathcal{H}^{2}-\mathcal{H}^{\prime})}{M_{\textrm{Pl}}^{2}})\pi+(-6\mathcal{H}^{3}+6\mathcal{H}\mathcal{H}^{\prime}-9\alpha_{\textrm{B}}\mathcal{H}\mathcal{H}^{\prime}-3\mathcal{H}^{2}\alpha_{B}{}^{\prime}+\frac{3(\rho_{m}+p_{m})\mathcal{H}a^{2}}{M_{\textrm{Pl}}^{2}})\chi\\
- & +(6\mathcal{H}^{3}-6\mathcal{H}\mathcal{H}^{\prime}+3\mathcal{H}^{2}\alpha_{B}{}^{\prime}+9\alpha_{\textrm{B}}\mathcal{H}\mathcal{H}^{\prime}-\frac{3(\rho_{m}+p_{m})\mathcal{H}a^{2}}{M_{\textrm{Pl}}^{2}})\Phi+(-3\alpha_{\textrm{B}}\mathcal{H}^{2})\chi^{\prime}+(6\mathcal{H}^{2}+3\mathcal{H}\alpha_{B}{}^{\prime}-6\mathcal{H}^{\prime}+3\alpha_{\textrm{B}}\mathcal{H}^{\prime}-\frac{3(\rho_{m}+p_{m})a^{2}}{M_{\textrm{Pl}}^{2}})\Phi^{\prime}+(3\alpha_{\textrm{B}}\mathcal{H})\Phi^{\prime\prime}\\
- & -\alpha_{\textrm{B}}\mathcal{H}\nabla^{2}\chi+(2\mathcal{H}^{2}-2\mathcal{H}^{\prime}-\frac{a^{2}(\rho_{m}+p_{m})}{M_{\textrm{Pl}}^{2}}+\mathcal{H}\alpha_{B}{}^{\prime}+\alpha_{\textrm{B}}\mathcal{H}^{\prime})\nabla^{2}\pi+\alpha_{\textrm{B}}\mathcal{H}\nabla^{2}\Phi\\
+\\
++\alpha_{K}\mathcal{H}^{2}\pi^{\prime\prime}-\alpha_{\textrm{B}}\mathcal{H}\nabla^{2}\Psi-3\alpha_{\textrm{B}}\mathcal{H}\Phi^{\prime\prime}+\bigl(\mathcal{H}^{2}\ \alpha_{K}{}^{\prime}+2\alpha_{\textrm{K}}\mathcal{H}\ (\mathcal{H}^{2}+\mathcal{H}^{\prime})\bigr)\pi^{\prime}-(3\ \alpha_{\textrm{B}}+\alpha_{\textrm{K}})\mathcal{H}^{2}\Psi^{\prime}-\ \frac{\nabla^{2}{}[\pi](M_{Pl}{}^{2}\mathcal{H}\ \alpha_{B}{}^{\prime}+M_{Pl}{}^{2}\alpha_{\textrm{B}}\ \mathcal{H}^{\prime}+\mathcal{E}_{\textrm{S}}a^{2}+\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\\
+-\frac{3\Phi^{\prime}(M_{Pl}{}^{2}\ \alpha_{\textrm{B}}\mathcal{H}^{2}+M_{Pl}{}^{2}\mathcal{H}\ \alpha_{B}{}^{\prime}+M_{Pl}{}^{2}\alpha_{\textrm{B}}\ \mathcal{H}^{\prime}+\mathcal{E}_{\textrm{S}}a^{2}+\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\\
++\Psi\bigl(-\mathcal{H}^{2}\ \alpha_{K}{}^{\prime}-\frac{\mathcal{H}(M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{2}+3M_{Pl}{}^{2}\mathcal{H}\ \alpha_{B}{}^{\prime}+9M_{Pl}{}^{2}\alpha_{\textrm{B}}\ \mathcal{H}^{\prime}+2M_{Pl}{}^{2}\alpha_{\textrm{K}}\ \mathcal{H}^{\prime}+3\mathcal{E}_{\textrm{S}}a^{2}+3\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\bigr)\\
++\pi(\mathcal{H}^{3}\alpha_{K}{}^{\prime}+\frac{M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{4}-3M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}\mathcal{H}^{\prime\prime}+3M_{Pl}{}^{2}\mathcal{H}^{3}\alpha_{B}{}^{\prime}+9M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}^{2}\mathcal{H}^{\prime}}{M_{Pl}{}^{2}})\\
++\frac{3M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{2}\mathcal{H}^{\prime}-3M_{Pl}{}^{2}\mathcal{H}\alpha_{B}{}^{\prime}\mathcal{H}^{\prime}-3M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}^{\prime}{}^{2}+3\mathcal{E}_{\textrm{S}}\mathcal{H}^{2}a^{2}+3\mathcal{H}^{2}\mathcal{P}_{\textrm{S}}a^{2}-3\mathcal{E}_{\textrm{S}}\mathcal{H}^{\prime}a^{2}-3\mathcal{P}_{\textrm{S}}\mathcal{H}a^{2}}{M_{Pl}{}^{2}}\\
+\\
+\\
++\alpha_{K}\mathcal{H}^{2}\pi^{\prime\prime}-\alpha_{\textrm{B}}\mathcal{H}\nabla^{2}\Psi-3\alpha_{\textrm{B}}\mathcal{H}\Phi^{\prime\prime}+A_{\pi^{\prime}}\pi^{\prime}+A_{\Psi^{\prime}}\Psi^{\prime}+A_{^{\nabla^{2}\pi}}\nabla^{2}\pi+A_{\Phi^{\prime}}\Phi^{\prime}+A_{\Psi}\Psi & +A_{\pi}\pi=0\\
+\\
+\\
+\\
+\\
+\\
+A_{^{\nabla^{2}\pi}}=-(\mathcal{H}\alpha_{B}{}^{\prime}+\alpha_{\textrm{B}}\mathcal{H}^{\prime})-\frac{(\mathcal{E}_{\textrm{S}}a^{2}+\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\\
+A_{\Phi^{\prime}}=-3(\alpha_{\textrm{B}}\mathcal{H}^{2}+\mathcal{H}\alpha_{B}{}^{\prime}+\alpha_{\textrm{B}}\mathcal{H}^{\prime})-\frac{3(\mathcal{E}_{\textrm{S}}a^{2}+\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\\
+A_{\Psi^{\prime}}=-(3\alpha_{\textrm{B}}+\alpha_{\textrm{K}})\mathcal{H}^{2}\\
+A_{\Psi}=-\mathcal{H}^{2}\alpha_{K}{}^{\prime}-\mathcal{H}(\alpha_{\textrm{K}}\mathcal{H}^{2}+3\mathcal{H}\alpha_{B}{}^{\prime}+9\alpha_{\textrm{B}}\mathcal{H}^{\prime}+2\alpha_{\textrm{K}}\mathcal{H}^{\prime})-\frac{3\mathcal{H}(\mathcal{E}_{\textrm{S}}a^{2}+3\mathcal{P}a^{2})}{M_{Pl}{}^{2}}\\
+A_{\pi^{\prime}}=\mathcal{H}^{2}\alpha_{K}{}^{\prime}+2\alpha_{\textrm{K}}\mathcal{H}(\mathcal{H}^{2}+\mathcal{H}^{\prime})\\
+A_{\pi}=(\mathcal{H}^{3}\alpha_{K}{}^{\prime}+\alpha_{\textrm{K}}\mathcal{H}^{4}-3\alpha_{\textrm{B}}\mathcal{H}\mathcal{H}^{\prime\prime}+3\mathcal{H}^{3}\alpha_{B}{}^{\prime}+9\alpha_{\textrm{B}}\mathcal{H}^{2}\mathcal{H}^{\prime})\\
++3\alpha_{\textrm{K}}\mathcal{H}^{2}\mathcal{H}^{\prime}-3\mathcal{H}\alpha_{B}{}^{\prime}\mathcal{H}^{\prime}-3\alpha_{\textrm{B}}\mathcal{H}^{\prime}{}^{2}+\frac{3\mathcal{E}_{\textrm{S}}\mathcal{H}^{2}a^{2}+3\mathcal{H}^{2}\mathcal{P}_{\textrm{S}}a^{2}-3\mathcal{E}_{\textrm{S}}\mathcal{H}^{\prime}a^{2}-3\mathcal{P}_{\textrm{S}}\mathcal{H}a^{2}}{M_{Pl}{}^{2}}\\
+\\
+\\
+\\
 \end{align*}
 
 \end_inset

@@ -304,7 +304,7 @@ struct cosmology
 
   // EFT parameters
   int MG_theory; // 0 means no MG, 1 is EFT and 2 is k-essence //Todo is ... (will be added)
-  int MG_treatment; // 0 means hiclass-interface 1 is being solved here
+  int MG_treatment=1; // 0 means hiclass-interface 1 is being solved here
   double bg_i[3];
   double Omega_mg;
   double w0_mg;

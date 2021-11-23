@@ -388,6 +388,100 @@ void projection_Tmunu_kessence( Field<FieldType> & T00, Field<FieldType> & T0i, 
     }
 
 #endif
+
+
+
+
+
+
+//////////////////////////
+// Update K-essence field (pi)
+//////////////////////////
+// Description:
+//   Updating K-essence pi_k field based on equation obtained by energy momentum conservation
+//
+// Arguments:
+//   phi        reference to field configuration
+//   pi_k       reference to k-essence field
+//   pi_dot      reference to pi_dot of kessence at (n+1/2)
+// Returns:
+//
+//////////////////////////
+template <class FieldType>
+void update_pi_EFT( double dtau, Field<FieldType> & pi , Field<FieldType> & pi_dot)
+{
+  Site x(pi.lattice());
+  for (x.first(); x.test(); x.next())
+    {
+      //*****************************************
+      //pi Updating which is linear by definition using pi_dot
+      //*****************************************
+      pi(x) = pi(x)  + dtau * ( pi_dot(x)) ; //  pi_k(n+1)
+      //*************************************************************************************
+    }
+}
+//////////////////////////
+// Update K-essence velocity field (zeta)
+//////////////////////////
+// Description:
+//   Updating K-essence zeta field based on equation obtained by energy momentum conservation
+//
+// Arguments:
+//   phi        reference to field configuration
+//   pi_k       reference to k-essence field
+//   piv_k      reference to first derivative of the field
+//   n_correcor_steps Number of time which goes through predictor corrector method.
+// Returns:
+//
+//////////////////////////
+
+template <class FieldType>
+void update_pi_prime_EFT(double dtau, double dx, double a, Field<FieldType> & phi, Field<FieldType> & phi_old, Field<FieldType> & chi, Field<FieldType> & chi_old, Field<FieldType> & pi , Field<FieldType> & pi_prime, double Hconf, double Hconf_prime, double rho_s, double P_s, double fourpiG, double alpha_K, double alpha_B, double alpha_K_prime, double alpha_B_prime)
+  {
+  double RHS, psi, Laplace_pi, Laplace_psi; // psi = phi - chi
+  double A_Laplace_psi, A_phi_prime_prime, A_Laplace_pi, A_phi_prime, A_psi_prime, A_psi, A_pi_prime, A_pi;
+  double Mpl2 = 1./(2. * fourpiG); //   fourpiG   1/2 Mpl^2 in the code unit
+
+  Site x(pi.lattice());
+  for (x.first(); x.test(); x.next())
+    {
+      //****************************************************************
+      //Laplace pi, pi(n) since pi is not updated yet
+      //****************************************************************
+      Laplace_pi= pi(x+0) + pi(x-0) - 2. * pi(x);
+      Laplace_pi+=pi(x+1) + pi(x-1) - 2. * pi(x);
+      Laplace_pi+=pi(x+2) + pi(x-2) - 2. * pi(x);
+      Laplace_pi= Laplace_pi/(dx*dx);
+
+      //****************************************************************
+      //Laplace psi, Laplace psi(n) = Laplace phi(n) - Laplace chi(n) since pi is not updated yet
+      //****************************************************************
+      Laplace_psi= (phi(x+0) - chi(x+0)) + (phi(x-0) - chi(x-0)) - 2. * (phi(x) - chi(x));
+      Laplace_psi+=(phi(x+1) - chi(x+1)) + (phi(x-1) - chi(x-1)) - 2. * (phi(x) - chi(x));
+      Laplace_psi+=(phi(x+2) - chi(x+2)) + (phi(x-2) - chi(x-2)) - 2. * (phi(x) - chi(x));
+      Laplace_psi= Laplace_psi/(dx*dx);
+
+
+      A_Laplace_psi = -alpha_B * Hconf;
+      A_phi_prime_prime = -3.0 * alpha_B * Hconf;
+      A_Laplace_pi = - (Hconf * alpha_B_prime + alpha_B * Hconf_prime) - a * a * (rho_s + P_s)/Mpl2;
+      A_phi_prime = - 3. * (alpha_B * Hconf * Hconf +  Hconf * alpha_B_prime + alpha_B * Hconf_prime) - 3. * a * a * (rho_s + P_s)/Mpl2;
+      A_psi_prime = - (3. * alpha_B + alpha_K) * Hconf * Hconf;
+      A_psi = - Hconf * Hconf * alpha_K_prime - Hconf * (alpha_K * Hconf * Hconf + 3. * Hconf * alpha_B_prime + 9. * alpha_B * Hconf_prime + 2. * alpha_K * Hconf_prime) - 3. * Hconf * a * a * (rho_s + P_s)/Mpl2;
+
+      A_pi_prime =  Hconf * Hconf * alpha_K_prime + 2. * alpha_K * Hconf * ( Hconf * Hconf + Hconf_prime);
+
+      A_pi = Hconf * Hconf * Hconf *  alpha_K_prime + alpha_K * Hconf * Hconf * Hconf * Hconf  - 3. * alpha_B * Hconf * Hconf_prime + 3. * Hconf * Hconf * Hconf * alpha_B_prime + 9. * alpha_B * Hconf * Hconf * Hconf_prime  + 3. * alpha_K * Hconf * Hconf * Hconf_prime - 3. * Hconf * alpha_B_prime * Hconf_prime - 3. * alpha_B * Hconf_prime * Hconf_prime + 3. * Hconf * Hconf * a * a * (rho_s * (1. - Hconf_prime/(Hconf * Hconf)) + P_s  * (1. - Hconf_prime/(Hconf * Hconf))) / Mpl2;
+
+      RHS = A_pi * pi(x) + A_pi_prime * pi_prime(x) + A_psi * (phi(x) - chi(x)) + A_phi_prime * (phi(x) - phi_old(x))/dtau;
+      RHS += A_psi_prime * ( (phi(x)-chi(x)) - (phi_old(x)-chi_old(x)) )/dtau + A_Laplace_pi * Laplace_pi + A_Laplace_psi * Laplace_psi + A_phi_prime_prime * 0; // We have to remove phi'' from the equations!
+    pi_prime(x) = pi_prime(x) * (1. - dtau * A_pi_prime/(Hconf * alpha_K))  - (dtau/(Hconf * alpha_K)) * RHS;
+
+       }
+}
+
+
+
 			//////////////////////////
 			// Update K-essence field (pi)
 			//////////////////////////

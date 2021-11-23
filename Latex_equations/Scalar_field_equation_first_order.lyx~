@@ -1,0 +1,126 @@
+#LyX 2.3 created this file. For more info see http://www.lyx.org/
+\lyxformat 544
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\use_microtype false
+\use_dash_ligatures true
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_package amsmath 2
+\use_package amssymb 2
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\use_minted 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\is_math_indent 0
+\math_numbering_side default
+\quotes_style english
+\dynamic_quotes 0
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Standard
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\xout off
+\uuline off
+\uwave off
+\noun off
+\color none
+\begin_inset Formula 
+\begin{align*}
+\\
++\alpha_{K}\mathcal{H}^{2}\pi^{\prime\prime}-\alpha_{\textrm{B}}\mathcal{H}\nabla^{2}\Psi-3\alpha_{\textrm{B}}\mathcal{H}\Phi^{\prime\prime}+\bigl(\mathcal{H}^{2}\ \alpha_{K}{}^{\prime}+2\alpha_{\textrm{K}}\mathcal{H}\ (\mathcal{H}^{2}+\mathcal{H}^{\prime})\bigr)\pi^{\prime}-(3\ \alpha_{\textrm{B}}+\alpha_{\textrm{K}})\mathcal{H}^{2}\Psi^{\prime}-\ \frac{\nabla^{2}{}[\pi](M_{Pl}{}^{2}\mathcal{H}\ \alpha_{B}{}^{\prime}+M_{Pl}{}^{2}\alpha_{\textrm{B}}\ \mathcal{H}^{\prime}+\mathcal{E}_{\textrm{S}}a^{2}+\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\\
+-\frac{3\Phi^{\prime}(M_{Pl}{}^{2}\ \alpha_{\textrm{B}}\mathcal{H}^{2}+M_{Pl}{}^{2}\mathcal{H}\ \alpha_{B}{}^{\prime}+M_{Pl}{}^{2}\alpha_{\textrm{B}}\ \mathcal{H}^{\prime}+\mathcal{E}_{\textrm{S}}a^{2}+\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\\
++\Psi\bigl(-\mathcal{H}^{2}\ \alpha_{K}{}^{\prime}-\frac{\mathcal{H}(M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{2}+3M_{Pl}{}^{2}\mathcal{H}\ \alpha_{B}{}^{\prime}+9M_{Pl}{}^{2}\alpha_{\textrm{B}}\ \mathcal{H}^{\prime}+2M_{Pl}{}^{2}\alpha_{\textrm{K}}\ \mathcal{H}^{\prime}+3\mathcal{E}_{\textrm{S}}a^{2}+3\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\bigr)\\
++\pi(\mathcal{H}^{3}\alpha_{K}{}^{\prime}+\frac{M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{4}-3M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}\mathcal{H}^{\prime\prime}+3M_{Pl}{}^{2}\mathcal{H}^{3}\alpha_{B}{}^{\prime}+9M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}^{2}\mathcal{H}^{\prime}+3M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{2}\mathcal{H}^{\prime}-3M_{Pl}{}^{2}\mathcal{H}\alpha_{B}{}^{\prime}\mathcal{H}^{\prime}-3M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}^{\prime}{}^{2}+3\mathcal{E}_{\textrm{S}}\mathcal{H}^{2}a^{2}+3\mathcal{H}^{2}\mathcal{P}_{\textrm{S}}a^{2}-3\mathcal{E}_{\textrm{S}}\mathcal{H}^{\prime}a^{2}-3\mathcal{P}_{\textrm{S}}\mathcal{H}a^{2}}{M_{Pl}{}^{2}})\\
+\\
+\\
++\alpha_{K}\mathcal{H}^{2}\pi^{\prime\prime}-\alpha_{\textrm{B}}\mathcal{H}\nabla^{2}\Psi-3\alpha_{\textrm{B}}\mathcal{H}\Phi^{\prime\prime}+A_{\pi^{\prime}}\pi^{\prime}+A_{\Psi^{\prime}}\Psi^{\prime}+A_{^{\nabla^{2}\pi}}\nabla^{2}\pi+A_{\Phi^{\prime}}\Phi^{\prime}\\
+\\
++A_{\Psi}\Psi\bigl(-\mathcal{H}^{2}\ \alpha_{K}{}^{\prime}-\frac{\mathcal{H}(M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{2}+3M_{Pl}{}^{2}\mathcal{H}\ \alpha_{B}{}^{\prime}+9M_{Pl}{}^{2}\alpha_{\textrm{B}}\ \mathcal{H}^{\prime}+2M_{Pl}{}^{2}\alpha_{\textrm{K}}\ \mathcal{H}^{\prime}+3\mathcal{E}_{\textrm{S}}a^{2}+3\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\bigr)\\
++\pi(\mathcal{H}^{3}\alpha_{K}{}^{\prime}+\frac{M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{4}-3M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}\mathcal{H}^{\prime\prime}+3M_{Pl}{}^{2}\mathcal{H}^{3}\alpha_{B}{}^{\prime}+9M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}^{2}\mathcal{H}^{\prime}+3M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{2}\mathcal{H}^{\prime}-3M_{Pl}{}^{2}\mathcal{H}\alpha_{B}{}^{\prime}\mathcal{H}^{\prime}-3M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}^{\prime}{}^{2}+3\mathcal{E}_{\textrm{S}}\mathcal{H}^{2}a^{2}+3\mathcal{H}^{2}\mathcal{P}_{\textrm{S}}a^{2}-3\mathcal{E}_{\textrm{S}}\mathcal{H}^{\prime}a^{2}-3\mathcal{P}_{\textrm{S}}\mathcal{H}a^{2}}{M_{Pl}{}^{2}})\\
+\\
+A_{\pi^{\prime}}= & \bigl(\mathcal{H}^{2}\ \alpha_{K}{}^{\prime}+2\alpha_{\textrm{K}}\mathcal{H}\ (\mathcal{H}^{2}+\mathcal{H}^{\prime})\bigr)\\
+A_{^{\nabla^{2}\pi}}=-\frac{(M_{Pl}{}^{2}\mathcal{H}\ \alpha_{B}{}^{\prime}+M_{Pl}{}^{2}\alpha_{\textrm{B}}\ \mathcal{H}^{\prime}+\mathcal{E}_{\textrm{S}}a^{2}+\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\\
+A_{\Phi^{\prime}}=-\frac{3(M_{Pl}{}^{2}\ \alpha_{\textrm{B}}\mathcal{H}^{2}+M_{Pl}{}^{2}\mathcal{H}\ \alpha_{B}{}^{\prime}+M_{Pl}{}^{2}\alpha_{\textrm{B}}\ \mathcal{H}^{\prime}+\mathcal{E}_{\textrm{S}}a^{2}+\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\\
+A_{\Psi^{\prime}}=-(3\ \alpha+\alpha_{\textrm{K}})\mathcal{H}^{2}\\
+A_{\Psi}=-\mathcal{H}^{2}\alpha_{K}{}^{\prime}-\frac{\mathcal{H}(M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{2}+3M_{Pl}{}^{2}\mathcal{H}\alpha_{B}{}^{\prime}+9M_{Pl}{}^{2}\alpha_{\textrm{B}}\mathcal{H}^{\prime}+2M_{Pl}{}^{2}\alpha_{\textrm{K}}\mathcal{H}^{\prime}+3\mathcal{E}_{\textrm{S}}a^{2}+3\mathcal{P}_{\textrm{S}}a^{2})}{M_{Pl}{}^{2}}\\
+\\
+\\
+\\
+\\
+\\
+\end{align*}
+
+\end_inset
+
+= =
+\end_layout
+
+\end_body
+\end_document

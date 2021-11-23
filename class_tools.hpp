@@ -503,7 +503,7 @@ void loadTransferFunctions(background & class_background, perturbs & class_pertu
       {
         tk_d[i] += -alpha * 3. * Hconf_class;
       }
-      else if (strncmp(qname,"tot",strlen("tot")) == 0)
+      else if (strncmp(qname,"tot",strlen("tot")) == 0) // Careful about smg, in d_tot scalar field is not included!
       {
         tk_d[i] += -alpha * 3. * Hconf_class * (Omega_m + 4. * Omega_rad/3. + Omega_mg * (1. + w_mg));
       }
