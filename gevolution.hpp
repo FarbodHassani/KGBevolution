@@ -54,7 +54,7 @@ using namespace LATfield2;
 //////////////////////////
 
 template <class FieldType>
-void prepareFTsource(Field<FieldType> & phi, Field<FieldType> & Tij, Field<FieldType> & Sij, const double coeff)
+void prepareFTsource(Field<FieldType> & phi, Field<FieldType> & Tij, Field<FieldType> & Sij,  const double coeff)
 {
 	Site x(phi.lattice());
 
@@ -143,6 +143,120 @@ void prepareFTsource(Field<FieldType> & phi, Field<FieldType> & Tij, Field<Field
 		Sij(x, 1, 2) += 0.5 * phi(x+1+2) * phi(x+1+2);
 #endif
 #endif
+	}
+}
+
+
+
+//////////////////////////
+// prepareFTsource (1)
+//////////////////////////
+// Description:
+//   construction of real-space source tensor for Fourier-based solvers
+//
+// Arguments:
+//   phi        reference to field configuration
+//   Tij        reference to symmetric tensor field containing the space-space
+//              components of the stress-energy tensor (rescaled by a^3)
+//   Sij        reference to allocated symmetric tensor field which will contain
+//              the source tensor (may be identical to Tji)
+//   coeff      scaling coefficient for Tij ("8 pi G dx^2 / a")
+//
+// Returns:
+//
+//////////////////////////
+
+template <class FieldType>
+void prepareFTsource(Field<FieldType> & phi, Field<FieldType> & Tij, Field<FieldType> & Sij, Field<FieldType> & deltaPm, const double coeff)
+{
+	Site x(phi.lattice());
+
+	for (x.first(); x.test(); x.next())
+	{
+		// 0-0-component:
+		Sij(x, 0, 0) = coeff * Tij(x, 0, 0);
+#ifdef PHINONLINEAR
+#ifdef ORIGINALMETRIC
+		Sij(x, 0, 0) -= 4. * phi(x) * (phi(x-0) + phi(x+0) - 2. * phi(x));
+		Sij(x, 0, 0) -= 0.5 * (phi(x+0) - phi(x-0)) * (phi(x+0) - phi(x-0));
+#else
+		Sij(x, 0, 0) += 0.5 * (phi(x+0) - phi(x-0)) * (phi(x+0) - phi(x-0));
+#endif
+#endif
+
+		// 1-1-component:
+		Sij(x, 1, 1) = coeff * Tij(x, 1, 1);
+#ifdef PHINONLINEAR
+#ifdef ORIGINALMETRIC
+		Sij(x, 1, 1) -= 4. * phi(x) * (phi(x-1) + phi(x+1) - 2. * phi(x));
+		Sij(x, 1, 1) -= 0.5 * (phi(x+1) - phi(x-1)) * (phi(x+1) - phi(x-1));
+#else
+		Sij(x, 1, 1) += 0.5 * (phi(x+1) - phi(x-1)) * (phi(x+1) - phi(x-1));
+#endif
+#endif
+
+		// 2-2-component:
+		Sij(x, 2, 2) = coeff * Tij(x, 2, 2);
+#ifdef PHINONLINEAR
+#ifdef ORIGINALMETRIC
+		Sij(x, 2, 2) -= 4. * phi(x) * (phi(x-2) + phi(x+2) - 2. * phi(x));
+		Sij(x, 2, 2) -= 0.5 * (phi(x+2) - phi(x-2)) * (phi(x+2) - phi(x-2));
+#else
+		Sij(x, 2, 2) += 0.5 * (phi(x+2) - phi(x-2)) * (phi(x+2) - phi(x-2));
+#endif
+#endif
+
+		// 0-1-component:
+		Sij(x, 0, 1) = coeff * Tij(x, 0, 1);
+#ifdef PHINONLINEAR
+		Sij(x, 0, 1) += phi(x+0) * phi(x+1) - phi(x) * phi(x+0+1);
+#ifdef ORIGINALMETRIC
+		Sij(x, 0, 1) -= 1.5 * phi(x) * phi(x);
+		Sij(x, 0, 1) += 1.5 * phi(x+0) * phi(x+0);
+		Sij(x, 0, 1) += 1.5 * phi(x+1) * phi(x+1);
+		Sij(x, 0, 1) -= 1.5 * phi(x+0+1) * phi(x+0+1);
+#else
+		Sij(x, 0, 1) += 0.5 * phi(x) * phi(x);
+		Sij(x, 0, 1) -= 0.5 * phi(x+0) * phi(x+0);
+		Sij(x, 0, 1) -= 0.5 * phi(x+1) * phi(x+1);
+		Sij(x, 0, 1) += 0.5 * phi(x+0+1) * phi(x+0+1);
+#endif
+#endif
+
+		// 0-2-component:
+		Sij(x, 0, 2) = coeff * Tij(x, 0, 2);
+#ifdef PHINONLINEAR
+		Sij(x, 0, 2) += phi(x+0) * phi(x+2) - phi(x) * phi(x+0+2);
+#ifdef ORIGINALMETRIC
+		Sij(x, 0, 2) -= 1.5 * phi(x) * phi(x);
+		Sij(x, 0, 2) += 1.5 * phi(x+0) * phi(x+0);
+		Sij(x, 0, 2) += 1.5 * phi(x+2) * phi(x+2);
+		Sij(x, 0, 2) -= 1.5 * phi(x+0+2) * phi(x+0+2);
+#else
+		Sij(x, 0, 2) += 0.5 * phi(x) * phi(x);
+		Sij(x, 0, 2) -= 0.5 * phi(x+0) * phi(x+0);
+		Sij(x, 0, 2) -= 0.5 * phi(x+2) * phi(x+2);
+		Sij(x, 0, 2) += 0.5 * phi(x+0+2) * phi(x+0+2);
+#endif
+#endif
+
+		// 1-2-component:
+		Sij(x, 1, 2) = coeff * Tij(x, 1, 2);
+#ifdef PHINONLINEAR
+		Sij(x, 1, 2) += phi(x+1) * phi(x+2) - phi(x) * phi(x+1+2);
+#ifdef ORIGINALMETRIC
+		Sij(x, 1, 2) -= 1.5 * phi(x) * phi(x);
+		Sij(x, 1, 2) += 1.5 * phi(x+1) * phi(x+1);
+		Sij(x, 1, 2) += 1.5 * phi(x+2) * phi(x+2);
+		Sij(x, 1, 2) -= 1.5 * phi(x+1+2) * phi(x+1+2);
+#else
+		Sij(x, 1, 2) += 0.5 * phi(x) * phi(x);
+		Sij(x, 1, 2) -= 0.5 * phi(x+1) * phi(x+1);
+		Sij(x, 1, 2) -= 0.5 * phi(x+2) * phi(x+2);
+		Sij(x, 1, 2) += 0.5 * phi(x+1+2) * phi(x+1+2);
+#endif
+#endif
+ deltaPm(x) =  (Tij(x, 0, 0) + Tij(x, 1, 1) + Tij(x, 2, 2))/3.0;
 	}
 }
 
@@ -436,11 +550,37 @@ void update_pi_EFT( double dtau, Field<FieldType> & pi , Field<FieldType> & pi_d
 //////////////////////////
 
 template <class FieldType>
-void update_pi_prime_EFT(double dtau, double dx, double a, Field<FieldType> & phi, Field<FieldType> & phi_old, Field<FieldType> & chi, Field<FieldType> & chi_old, Field<FieldType> & pi , Field<FieldType> & pi_prime, double Hconf, double Hconf_prime, double rho_s, double P_s, double fourpiG, double alpha_K, double alpha_B, double alpha_K_prime, double alpha_B_prime)
+void update_pi_prime_EFT(double dtau, double dx, double a, Field<FieldType> & phi, Field<FieldType> & phi_old, Field<FieldType> & chi, Field<FieldType> & chi_old, Field<FieldType> & pi , Field<FieldType> & pi_prime, Field<FieldType> & deltaPm, double Hconf, double Hconf_prime, double rho_s, double P_s, double fourpiG, double alpha_K, double alpha_B, double alpha_K_prime, double alpha_B_prime)
   {
-  double RHS, psi, Laplace_pi, Laplace_psi; // psi = phi - chi
-  double A_Laplace_psi, A_phi_prime_prime, A_Laplace_pi, A_phi_prime, A_psi_prime, A_psi, A_pi_prime, A_pi;
+  double RHS, Laplace_pi, Laplace_chi, Laplace_phi; // psi = phi - chi
+  double A_Laplace_chi, A_Laplace_phi, A_pi_prime_prime, A_chi_prime, A_deltaPm, A_phi_prime, A_Laplace_pi, A_pi_prime, A_chi, A_phi, A_pi ;
   double Mpl2 = 1./(2. * fourpiG); //   fourpiG   1/2 Mpl^2 in the code unit
+  double P_s_prime=0;
+  double Hconf_prime_prime = 0;
+  A_Laplace_chi = alpha_B * Hconf;
+  A_Laplace_phi = -alpha_B * Hconf;
+  A_pi_prime_prime = (3. * alpha_B * alpha_B /2. + alpha_K) * Hconf* Hconf;
+  A_chi_prime = (3. * alpha_B * alpha_B /2. + alpha_K) * Hconf* Hconf;
+  A_deltaPm = -3.0 * alpha_B * Hconf * a * a/(2.0 * Mpl2);
+  A_phi_prime =  3. * Hconf * Hconf * (alpha_B - alpha_B * alpha_B/2. - alpha_K/3. - alpha_B_prime/Hconf - alpha_B * Hconf_prime/Hconf/Hconf -  a * a * (rho_s + P_s)/(Mpl2 * Hconf * Hconf));
+  A_Laplace_pi = - (Hconf * alpha_B_prime + alpha_B * Hconf_prime) - a * a * (rho_s + P_s)/Mpl2;
+  A_pi_prime =  3. * Hconf * Hconf * Hconf * (3. * alpha_B * alpha_B/2. + 2. * alpha_K/3.
+                + alpha_B * alpha_B_prime/(2. * Hconf) + 2. * alpha_K_prime/(3. * Hconf)
+                +  alpha_B * alpha_B * Hconf_prime/(2. * Hconf * Hconf) + 2. * alpha_K * Hconf_prime/(3. * Hconf * Hconf)
+                +  ( Hconf * Hconf + Hconf_prime) - a * a * alpha_B *  (rho_s + P_s)/(2. * Hconf * Hconf* Mpl2));
+  A_chi = 3. * Hconf * Hconf * Hconf * (-alpha_B +  alpha_B * alpha_B + alpha_K/3.
+                +  alpha_B_prime/Hconf + alpha_B * alpha_B_prime/(2. * Hconf) + alpha_K_prime/(3. * Hconf)
+                +  alpha_B * Hconf_prime/(Hconf * Hconf)
+                + alpha_B * alpha_B * Hconf_prime/(2. * Hconf * Hconf) + 2. * alpha_K * Hconf_prime/(3. * Hconf * Hconf)
+                 + a * a * (1 - alpha_B/2.) *  (rho_s + P_s)/( Hconf * Hconf* Mpl2));
+ A_phi = 3. * Hconf * Hconf * Hconf * (-alpha_B +  alpha_B * alpha_B + alpha_K/3.
+               +  alpha_B_prime/Hconf + alpha_B * alpha_B_prime/(2. * Hconf) + alpha_K_prime/(3. * Hconf)
+               +  alpha_B * Hconf_prime/(Hconf * Hconf)
+               + alpha_B * alpha_B * Hconf_prime/(2. * Hconf * Hconf) + 2. * alpha_K * Hconf_prime/(3. * Hconf * Hconf)
+                + a * a * (1 - alpha_B/2.) *  (rho_s + P_s)/( Hconf * Hconf* Mpl2));
+
+  A_pi = 3.0 * Hconf * Hconf * Hconf * Hconf * (alpha_B * alpha_B + alpha_K/3. - alpha_B * Hconf_prime_prime/(Hconf * Hconf * Hconf) + alpha_B_prime/Hconf + alpha_B * alpha_B_prime/(2. * Hconf) + alpha_K_prime/(3. * Hconf) + 3. * alpha_B * Hconf_prime/(Hconf * Hconf) + alpha_B * alpha_B * Hconf_prime/(Hconf * Hconf) + alpha_K * Hconf_prime/(Hconf * Hconf) - alpha_B_prime * Hconf_prime/(Hconf * Hconf * Hconf) - alpha_B * Hconf_prime * Hconf_prime/(Hconf * Hconf * Hconf * Hconf) +  a * a * (1. - alpha_B/2.) * (rho_s + P_s)/( Hconf * Hconf* Mpl2)  - a * a * (rho_s * Hconf_prime + P_s * Hconf_prime + P_s_prime * alpha_B/2.)/( Hconf * Hconf * Hconf * Hconf * Mpl2) );
+
 
   Site x(pi.lattice());
   for (x.first(); x.test(); x.next())
@@ -454,28 +594,24 @@ void update_pi_prime_EFT(double dtau, double dx, double a, Field<FieldType> & ph
       Laplace_pi= Laplace_pi/(dx*dx);
 
       //****************************************************************
-      //Laplace psi, Laplace psi(n) = Laplace phi(n) - Laplace chi(n) since pi is not updated yet
+      // Laplace chi(n) since pi is not updated yet
       //****************************************************************
-      Laplace_psi= (phi(x+0) - chi(x+0)) + (phi(x-0) - chi(x-0)) - 2. * (phi(x) - chi(x));
-      Laplace_psi+=(phi(x+1) - chi(x+1)) + (phi(x-1) - chi(x-1)) - 2. * (phi(x) - chi(x));
-      Laplace_psi+=(phi(x+2) - chi(x+2)) + (phi(x-2) - chi(x-2)) - 2. * (phi(x) - chi(x));
-      Laplace_psi= Laplace_psi/(dx*dx);
+      Laplace_chi= chi(x+0) + chi(x-0) - 2. * chi(x);
+      Laplace_chi+=chi(x+1) + chi(x-1) - 2. * chi(x);
+      Laplace_chi+=chi(x+2) + chi(x-2) - 2. * chi(x);
+      Laplace_chi= Laplace_chi/(dx*dx);
 
+      //****************************************************************
+      // Laplace chi(n) since pi is not updated yet
+      //****************************************************************
+      Laplace_phi= phi(x+0) + phi(x-0) - 2. * phi(x);
+      Laplace_phi+=phi(x+1) + phi(x-1) - 2. * phi(x);
+      Laplace_phi+=phi(x+2) + phi(x-2) - 2. * phi(x);
+      Laplace_phi= Laplace_phi/(dx*dx);
 
-      A_Laplace_psi = -alpha_B * Hconf;
-      A_phi_prime_prime = -3.0 * alpha_B * Hconf;
-      A_Laplace_pi = - (Hconf * alpha_B_prime + alpha_B * Hconf_prime) - a * a * (rho_s + P_s)/Mpl2;
-      A_phi_prime = - 3. * (alpha_B * Hconf * Hconf +  Hconf * alpha_B_prime + alpha_B * Hconf_prime) - 3. * a * a * (rho_s + P_s)/Mpl2;
-      A_psi_prime = - (3. * alpha_B + alpha_K) * Hconf * Hconf;
-      A_psi = - Hconf * Hconf * alpha_K_prime - Hconf * (alpha_K * Hconf * Hconf + 3. * Hconf * alpha_B_prime + 9. * alpha_B * Hconf_prime + 2. * alpha_K * Hconf_prime) - 3. * Hconf * a * a * (rho_s + P_s)/Mpl2;
-
-      A_pi_prime =  Hconf * Hconf * alpha_K_prime + 2. * alpha_K * Hconf * ( Hconf * Hconf + Hconf_prime);
-
-      A_pi = Hconf * Hconf * Hconf *  alpha_K_prime + alpha_K * Hconf * Hconf * Hconf * Hconf  - 3. * alpha_B * Hconf * Hconf_prime + 3. * Hconf * Hconf * Hconf * alpha_B_prime + 9. * alpha_B * Hconf * Hconf * Hconf_prime  + 3. * alpha_K * Hconf * Hconf * Hconf_prime - 3. * Hconf * alpha_B_prime * Hconf_prime - 3. * alpha_B * Hconf_prime * Hconf_prime + 3. * Hconf * Hconf * a * a * (rho_s * (1. - Hconf_prime/(Hconf * Hconf)) + P_s  * (1. - Hconf_prime/(Hconf * Hconf))) / Mpl2;
-
-      RHS = A_pi * pi(x) + A_pi_prime * pi_prime(x) + A_psi * (phi(x) - chi(x)) + A_phi_prime * (phi(x) - phi_old(x))/dtau;
-      RHS += A_psi_prime * ( (phi(x)-chi(x)) - (phi_old(x)-chi_old(x)) )/dtau + A_Laplace_pi * Laplace_pi + A_Laplace_psi * Laplace_psi + A_phi_prime_prime * 0; // We have to remove phi'' from the equations!
-    pi_prime(x) = pi_prime(x) * (1. - dtau * A_pi_prime/(Hconf * alpha_K))  - (dtau/(Hconf * alpha_K)) * RHS;
+      RHS = A_pi * pi(x) +  A_chi * chi(x) + A_phi * phi(x) + A_pi_prime * pi_prime(x)  + A_chi_prime * (chi(x) -chi_old(x))/dtau  + A_phi_prime * (phi(x) - phi_old(x))/dtau + A_Laplace_pi * Laplace_pi + A_Laplace_chi * Laplace_chi  + A_Laplace_phi * Laplace_phi + A_deltaPm * deltaPm(x); // We have to remove phi'' from the equations!
+    pi_prime(x) = pi_prime(x) * (1. - dtau * A_pi_prime/(A_pi_prime_prime)) - (dtau/(A_pi_prime_prime * (1 + dtau * A_pi_prime/(2.0 * A_pi_prime_prime)) ) ) * RHS;
+    cout<<"RHS: "<<RHS<<"   pi_prime(x):"<< pi_prime(x)<<endl;
 
        }
 }

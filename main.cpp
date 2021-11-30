@@ -291,7 +291,7 @@ int main(int argc, char **argv)
   Field<Cplx> scalarFT_cs2_full;
   #endif
 	Field<Real> pi_k;
-	// Field<Real> zeta_integer;
+  Field<Real> deltaPm; // matter pressure perturbation
   Field<Real> zeta_half;
 	Field<Real> T00_Kess;
 	Field<Real> T0i_Kess;
@@ -304,6 +304,7 @@ int main(int argc, char **argv)
   #endif
 	Field<Cplx> scalarFT_chi_old;
 	Field<Cplx> scalarFT_pi;
+  Field<Cplx> scalarFT_deltaPm;
 	// Field<Cplx> scalarFT_zeta_integer;
   Field<Cplx> scalarFT_zeta_half;
 	Field<Cplx> T00_KessFT;
@@ -376,6 +377,10 @@ int main(int argc, char **argv)
 	pi_k.initialize(lat,1);
 	scalarFT_pi.initialize(latFT,1);
 	PlanFFT<Cplx> plan_pi_k(&pi_k, &scalarFT_pi);
+
+  deltaPm.initialize(lat,1);
+  scalarFT_deltaPm.initialize(latFT,1);
+  PlanFFT<Cplx> plan_deltaPm(&deltaPm, &scalarFT_deltaPm);
 	//zeta_integer_k kessence
 	// zeta_half.initialize(lat,1);
 	// scalarFT_zeta_half.initialize(latFT,1);
@@ -1011,7 +1016,7 @@ string str_filename5 ;
 		}
 		// done recording background data
 
-		prepareFTsource<Real>(phi, Sij, Sij, 2. * fourpiG * dx * dx / a);  // prepare nonlinear source for additional equations
+		prepareFTsource<Real>(phi, Sij, Sij, deltaPm, 2. * fourpiG * dx * dx / a);  // prepare nonlinear source for additional equations
 
 #ifdef BENCHMARK
 		ref2_time= MPI_Wtime();
@@ -1255,7 +1260,7 @@ if (cosmo.MG_theory == 1 && cosmo.kessence_theory == 0 && cosmo.MG_treatment==1 
     {
       for (i=0;i<sim.nKe_numsteps;i++)
       {
-       update_pi_prime_EFT(-dtau/ (2. * sim.nKe_numsteps), dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), fourpiG, gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
+       update_pi_prime_EFT(-dtau/ (2. * sim.nKe_numsteps), dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half, deltaPm, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), fourpiG, gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
        zeta_half.updateHalo();
       }
     }
@@ -1271,7 +1276,7 @@ if (cosmo.MG_theory == 1 && cosmo.kessence_theory == 0 && cosmo.MG_treatment==1 
       //We also update zeta_int from n to n+1
       //********************************************************************************
 
-      update_pi_prime_EFT(dtau/ sim.nKe_numsteps, dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), fourpiG, gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
+      update_pi_prime_EFT(dtau/ sim.nKe_numsteps, dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half, deltaPm, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), fourpiG, gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
       zeta_half.updateHalo();
       //********************************************************************************
       //Since we have pi(n+1)=pi(n) + pi'(n+1/2), and in pi'(n+1/2) we have H(n+1/2) we update the background before updating the pi to have H(n+1/2), Moreover zeta(n+1) = zeta(n+1/2) + zeta'(n+1/2), so we put zeta_int updating in the pi updating!
