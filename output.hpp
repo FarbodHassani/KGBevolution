@@ -120,7 +120,7 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 	if (sim.out_snapshot & MASK_PI_K)
 			pi_k->saveHDF5_server_open(h5filename + filename + "_pi_k");
 
-	if (sim.out_snapshot & MASK_zeta)
+	if (sim.out_snapshot & MASK_ZETA)
 			zeta->saveHDF5_server_open(h5filename + filename + "_zeta");
 	//Kessence end
 
@@ -2052,7 +2052,7 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 			// writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI/sqrt(2./3.*fourpiG)/sqrt(2./3.*fourpiG), filename, "power spectrum of pi_k * H0  (dimensionless)", a, sim.z_pk[pkcount]);
 		}
 
-	     if (sim.out_pk & MASK_zeta)
+	     if (sim.out_pk & MASK_ZETA)
 		{
 			plan_zeta->execute(FFT_FORWARD);
 			extractPowerSpectrum(*scalarFT_zeta, kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);

@@ -550,13 +550,18 @@ void update_pi_EFT( double dtau, Field<FieldType> & pi , Field<FieldType> & pi_d
 //////////////////////////
 
 template <class FieldType>
-void update_pi_prime_EFT(double dtau, double dx, double a, Field<FieldType> & phi, Field<FieldType> & phi_old, Field<FieldType> & chi, Field<FieldType> & chi_old, Field<FieldType> & pi , Field<FieldType> & pi_prime, Field<FieldType> & deltaPm, double Hconf, double Hconf_prime, double rho_s, double P_s, double fourpiG, double alpha_K, double alpha_B, double alpha_K_prime, double alpha_B_prime)
+void update_pi_prime_EFT(double dtau, double dx, double a, double fourpiG, double H0_hiclass, Field<FieldType> & phi, Field<FieldType> & phi_old, Field<FieldType> & chi, Field<FieldType> & chi_old, Field<FieldType> & pi, Field<FieldType> & pi_prime, Field<FieldType> & deltaPm, double Hconf, double Hconf_prime, double Hconf_prime_prime, double rho_s, double P_s, double P_s_prime, double alpha_K, double alpha_B, double alpha_K_prime, double alpha_B_prime)
   {
   double RHS, Laplace_pi, Laplace_chi, Laplace_phi; // psi = phi - chi
   double A_Laplace_chi, A_Laplace_phi, A_pi_prime_prime, A_chi_prime, A_deltaPm, A_phi_prime, A_Laplace_pi, A_pi_prime, A_chi, A_phi, A_pi ;
   double Mpl2 = 1./(2. * fourpiG); //   fourpiG   1/2 Mpl^2 in the code unit
-  double P_s_prime=0;
-  double Hconf_prime_prime = 0;
+  double density_norm = 3.0 *  (2./3.*fourpiG)/(H0_hiclass * H0_hiclass); // densities and pressures in hiclass are in [1/Mpc^2] and H[1/Mpc] so to make it dimensionless we have rho[1/Mpc^2]/H[1/Mpc]^2 and then we multiply to H_gev^2 to go to gevolution units!
+  rho_s = rho_s * density_norm; // To make it in gevolution units, also densities in hiclass alre multiplied by 8 * pi G/3.
+  P_s = P_s * density_norm; // To make it in gevolution units
+  alpha_B_prime = alpha_B_prime * sqrt(2./3.*fourpiG)/H0_hiclass; // alpha_B_prime[gevolution]  = alpha_B_prime[hiclass ][1/Mpc] * H_0 [gevolution]/ H_0 [hiclass]
+  alpha_K_prime = alpha_K_prime * sqrt(2./3.*fourpiG)/H0_hiclass;
+  P_s_prime= P_s_prime * density_norm * sqrt(2./3.*fourpiG)/H0_hiclass; // density norm as well as the derivative unit consideration
+  Hconf_prime_prime = Hconf_prime_prime * (2./3.*fourpiG)* sqrt(2./3.*fourpiG)/H0_hiclass/H0_hiclass/H0_hiclass; // H''[1/Mpc^3]
   A_Laplace_chi = alpha_B * Hconf;
   A_Laplace_phi = -alpha_B * Hconf;
   A_pi_prime_prime = (3. * alpha_B * alpha_B /2. + alpha_K) * Hconf* Hconf;
@@ -611,7 +616,14 @@ void update_pi_prime_EFT(double dtau, double dx, double a, Field<FieldType> & ph
 
       RHS = A_pi * pi(x) +  A_chi * chi(x) + A_phi * phi(x) + A_pi_prime * pi_prime(x)  + A_chi_prime * (chi(x) -chi_old(x))/dtau  + A_phi_prime * (phi(x) - phi_old(x))/dtau + A_Laplace_pi * Laplace_pi + A_Laplace_chi * Laplace_chi  + A_Laplace_phi * Laplace_phi + A_deltaPm * deltaPm(x); // We have to remove phi'' from the equations!
     pi_prime(x) = pi_prime(x) * (1. - dtau * A_pi_prime/(A_pi_prime_prime)) - (dtau/(A_pi_prime_prime * (1 + dtau * A_pi_prime/(2.0 * A_pi_prime_prime)) ) ) * RHS;
-    cout<<"RHS: "<<RHS<<"   pi_prime(x):"<< pi_prime(x)<<endl;
+
+
+// TEST:
+// RHS = A_pi * pi(x) +  A_chi * chi(x) + A_phi * phi(x) + A_pi_prime * pi_prime(x)  + A_chi_prime * (chi(x) -chi_old(x))/dtau  + A_phi_prime * (phi(x) - phi_old(x))/dtau + A_Laplace_pi * Laplace_pi + A_Laplace_chi * Laplace_chi  + A_Laplace_phi * Laplace_phi + A_deltaPm * deltaPm(x); // We have to remove phi'' from the equations!
+
+// pi_prime(x) = pi_prime(x) + 0.1 * pi(x);
+
+    // cout<<"A_pi: "<<A_pi<<" A_chi:"<<A_chi<<" A_phi: "<<A_phi<<" A_pi_prime: "<<A_pi_prime<<" A_chi_prime:"<<A_chi_prime<<" A_phi_prime: "<<A_phi_prime<<" A_Laplace_pi:"<<A_Laplace_pi<<" A_Laplace_chi: "<<A_Laplace_chi<<" A_Laplace_phi: "<<A_Laplace_phi<<" A_deltaPm: "<<A_deltaPm<<endl;
 
        }
 }

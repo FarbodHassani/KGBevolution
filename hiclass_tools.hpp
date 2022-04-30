@@ -458,7 +458,6 @@ void loadTransferFunctions(background & class_background, perturbs & class_pertu
 	char * ptr;
   // hiclass bg inputs
   double a = 1./(1.+z);
-  // double Hconf_class=0.002, Omega_m=0.3,  Omega_smg=0.68 , Omega_rad=0.00001, w_smg = -0.9;
   perturb_output_titles(&class_background, &class_perturbs, class_format, coltitles);
 
   if (strncmp(qname,"vx",strlen("vx")) == 0)

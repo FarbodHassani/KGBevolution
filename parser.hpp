@@ -663,7 +663,7 @@ bool parseFieldSpecifiers(parameter * & params, const int numparam, const char *
 				else if (strcmp(item, "pi_k") == 0 || strcmp(item, "Pi_k") == 0)
 					pvalue |= MASK_PI_K;
 				else if (strcmp(item, "zeta") == 0 || strcmp(item, "zeta") == 0)
-					pvalue |= MASK_zeta;
+					pvalue |= MASK_ZETA;
           //Kessence end
 				else if (strcmp(item, "Chi") == 0 || strcmp(item, "chi") == 0)
 					pvalue |= MASK_CHI;
@@ -717,7 +717,7 @@ bool parseFieldSpecifiers(parameter * & params, const int numparam, const char *
 			else if (strcmp(start, "Pi_k") == 0 || strcmp(start, "pi_k") == 0)
 				pvalue |= MASK_PI_K;
 			else if (strcmp(start, "zeta") == 0 || strcmp(start, "zeta") == 0)
-				pvalue |= MASK_zeta;
+				pvalue |= MASK_ZETA;
         //Kessence end
 			else if (strcmp(start, "Chi") == 0 || strcmp(start, "chi") == 0)
 				pvalue |= MASK_CHI;
@@ -1752,6 +1752,10 @@ if (cosmo.MG_theory == 1) // EFT MG gravity
       cosmo.wa_mg = cosmo.bg_i[2];
 
       COUT<<"The expansion parameters are: "<<"\033[1;32m Omega_smg= \033[0m" << cosmo.Omega_mg <<"\033[1;32m, w0_smg= \033[0m" << cosmo.w0_mg <<"\033[1;32m, wa_smg= \033[0m" << cosmo.wa_mg <<endl;
+      if (!parseParameter(params, numparam, "n_field_update",  sim.nKe_numsteps))
+      {
+        sim.nKe_numsteps = 1;
+      }
     }
   }
   //EFTevolution end
@@ -1795,7 +1799,7 @@ if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 1 )
 	{
 			cosmo.w_kessence=-0.9;
 	}
-  if (!parseParameter(params, numparam, "nKe_numsteps",  sim.nKe_numsteps))
+  if (!parseParameter(params, numparam, "n_field_update",  sim.nKe_numsteps))
   {
     sim.nKe_numsteps = 1;
   }

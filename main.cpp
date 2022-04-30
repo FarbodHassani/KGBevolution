@@ -35,11 +35,6 @@
 #include <stdlib.h>
 #include <set>
 #include <vector>
-#ifdef BACKREACTION_TEST
-#include <iomanip>
-#include<fstream>
-#include<sstream>
-#endif
 #ifdef HAVE_CLASS
 #include "class.h"
 #undef MAX			// due to macro collision this has to be done BEFORE including LATfield2 headers!
@@ -134,6 +129,8 @@ int main(int argc, char **argv)
   gsl_spline * alpha_B_prime = NULL;
 	gsl_spline * rho_smg_spline = NULL;
 	gsl_spline * p_smg_spline = NULL;
+  gsl_spline * p_smg_prime_spline = NULL;
+  gsl_spline * H_prime_prime_spline = NULL;
 	gsl_spline * rho_crit_spline = NULL;
 	#endif
 
@@ -235,6 +232,8 @@ int main(int argc, char **argv)
   loadBGFunctions(class_background, cs2_spline, "c_s^2", sim.z_in);
   loadBGFunctions(class_background, rho_smg_spline, "(.)rho_smg", sim.z_in);
   loadBGFunctions(class_background, p_smg_spline, "(.)p_smg", sim.z_in);
+  loadBGFunctions(class_background, p_smg_prime_spline, "(.)p_smg_prime", sim.z_in);
+  loadBGFunctions(class_background, H_prime_prime_spline, "H_prime_prime", sim.z_in);
   loadBGFunctions(class_background, alpha_K, "kineticity_smg", sim.z_in);
   loadBGFunctions(class_background, alpha_B, "braiding_smg", sim.z_in);
   loadBGFunctions(class_background, alpha_K_prime, "kineticity_prime_smg", sim.z_in);
@@ -277,19 +276,7 @@ int main(int argc, char **argv)
 	//kessence
 	Field<Real> phi_old;
   //phi at two step before to compute phi'(n+1/2)
-  #ifdef BACKREACTION_TEST
-  Field<Real> short_wave;
-  Field<Real> relativistic_term;
-  Field<Real> stress_tensor;
-  Field<Real> pi_k_old;
-  Field<Real> det_gamma;
-  Field<Real> det_gamma_old;
-  Field<Real> cs2_full;
-  Field<Cplx> scalarFT_pi_old;
-  Field<Cplx> scalarFT_det_gamma;
-  Field<Cplx> scalarFT_det_gamma_old;
-  Field<Cplx> scalarFT_cs2_full;
-  #endif
+
 	Field<Real> pi_k;
   Field<Real> deltaPm; // matter pressure perturbation
   Field<Real> zeta_half;
@@ -297,11 +284,6 @@ int main(int argc, char **argv)
 	Field<Real> T0i_Kess;
 	Field<Real> Tij_Kess;
 	Field<Cplx> scalarFT_phi_old;
-  #ifdef BACKREACTION_TEST
-  Field<Cplx> short_wave_scalarFT;
-  Field<Cplx> relativistic_term_scalarFT;
-  Field<Cplx> stress_tensor_scalarFT;
-  #endif
 	Field<Cplx> scalarFT_chi_old;
 	Field<Cplx> scalarFT_pi;
   Field<Cplx> scalarFT_deltaPm;
@@ -337,43 +319,10 @@ int main(int argc, char **argv)
   	PlanFFT<Cplx> plan_vi(&vi, &viFT);
   	double a_old;
   #endif
-  #ifdef BACKREACTION_TEST
-  if(parallel.isRoot()) cout << "\033[1;31m The blowup tests are requested\033[0m\n";
-    pi_k_old.initialize(lat,1);
-  	scalarFT_pi_old.initialize(latFT,1);
-  	PlanFFT<Cplx> plan_pi_k_old(&pi_k_old, &scalarFT_pi_old);
-    /// zeta
-    det_gamma.initialize(lat,1);
-    scalarFT_det_gamma.initialize(latFT,1);
-    PlanFFT<Cplx> plan_det_gamma(&det_gamma, &scalarFT_det_gamma);
-
-    det_gamma_old.initialize(lat,1);
-    scalarFT_det_gamma_old.initialize(latFT,1);
-    PlanFFT<Cplx> plan_det_gamma_old(&det_gamma_old, &scalarFT_det_gamma_old);
-
-    cs2_full.initialize(lat,1);
-    scalarFT_cs2_full.initialize(latFT,1);
-    PlanFFT<Cplx> plan_cs2_full(&cs2_full, &scalarFT_cs2_full);
-
-  #endif
-	//Kessence part initializing
-	//Phi_old
 	phi_old.initialize(lat,1);
 	scalarFT_phi_old.initialize(latFT,1);
 	PlanFFT<Cplx> plan_phi_old(&phi_old, &scalarFT_phi_old);
   //Relativistic corrections
-  #ifdef BACKREACTION_TEST
-  short_wave.initialize(lat,1);
-  short_wave_scalarFT.initialize(latFT,1);
-  PlanFFT<Cplx> short_wave_plan(&short_wave, &short_wave_scalarFT);
-  relativistic_term.initialize(lat,1);
-  relativistic_term_scalarFT.initialize(latFT,1);
-  PlanFFT<Cplx> relativistic_term_plan(&relativistic_term, &relativistic_term_scalarFT);
-  stress_tensor.initialize(lat,1);
-  stress_tensor_scalarFT.initialize(latFT,1);
-  PlanFFT<Cplx> stress_tensor_plan(&stress_tensor, &stress_tensor_scalarFT);
-  #endif
-	//pi_k kessence
 	pi_k.initialize(lat,1);
 	scalarFT_pi.initialize(latFT,1);
 	PlanFFT<Cplx> plan_pi_k(&pi_k, &scalarFT_pi);
@@ -546,183 +495,14 @@ int main(int argc, char **argv)
 	if (numparam > 0) free(params);
 #endif
 
-
-#ifdef BACKREACTION_TEST
-
-// In case we want to initialize the IC ourselves
-for (x.first(); x.test(); x.next())
-  {
-    zeta_half(x)=phi(x);
-    pi_k(x)=0.0;
-  }
-  zeta_half.updateHalo();  // communicate halo values
-  pi_k.updateHalo();  // communicate halo values
-
-//   //****************************
-//   //****SAVE DATA To test Backreaction
-//   //****************************
-  FILE* Result_avg;
-  FILE* Result_real;
-  FILE* Result_fourier;
-  FILE* Result_max;
-  FILE* Redshifts;
-  FILE* snapshots_file;
-
-  char filename_avg[60];
-  char filename_real[60];
-  char filename_fourier[60];
-  char filename_max[60];
-  char filename_redshift[60];
-  char filename_snapshot[60];
-
-  snprintf(filename_avg, sizeof(filename_avg),"./output/Result_avg.txt");
-  snprintf(filename_real, sizeof(filename_real),"./output/Result_real.txt");
-  snprintf(filename_fourier, sizeof(filename_fourier),"./output/Result_fourier.txt");
-  snprintf(filename_max, sizeof(filename_max),"./output/Results_max.txt");
-  snprintf(filename_snapshot, sizeof(filename_snapshot),"./output/snapshots.txt");
-
-  // ofstream out(filename_avg,ios::out);
-  ofstream out_avg(filename_avg,ios::out);
-  ofstream out_real(filename_real,ios::out);
-  ofstream out_fourier(filename_fourier,ios::out);
-  ofstream out_max(filename_max,ios::out);
-  ofstream out_snapshots(filename_snapshot,ios::out);
-  snapshots_file=fopen(filename_snapshot,"w");
-
-
-  Result_avg=fopen(filename_avg,"w");
-  Result_real=fopen(filename_real,"w");
-  Result_fourier=fopen(filename_fourier,"w");
-  Result_max=fopen(filename_max,"w");
-  snapshots_file=fopen(filename_snapshot,"w");
-
-  out_avg<<"### The result of the average over time \n### d tau = "<< dtau<<endl;
-  out_avg<<"### number of kessence update = "<<  sim.nKe_numsteps <<endl;
-  out_avg<<"### initial time = "<< tau <<endl;
-  out_avg<<"### 1- tau\t2- average(H pi_k)\t3- average (zeta)\t 4- average (deta_gamma)\t 5- average (phi)\t6-z(redshift)  \t7-avg(c_s2) " <<endl;
-
-
-  out_max<<"### The result of the maximum over time \n### d tau = "<< dtau<<endl;
-  out_max<<"### number of kessence update = "<<  sim.nKe_numsteps <<endl;
-  out_max<<"### initial time = "<< tau <<endl;
-  out_max<<"### 1- tau\t2- max(H pi_k)\t3- max (zeta)\t 4- max (phi)   " <<endl;
-
-
-  out_real<<"### The result of the verage over time \n### d tau = "<< dtau<<endl;
-  out_real<<"### number of kessence update = "<<  sim.nKe_numsteps <<endl;
-  out_real<<"### initial time = "<< tau <<endl;
-  out_real<<"### 1- tau\t2- pi_k(x)\t3-zeta(x)\t 4-x" <<endl;
-
-
-  out_fourier<<"### The result of the average over time \n### d tau = "<< dtau<<endl;
-  out_fourier<<"### number of kessence update = "<<  sim.nKe_numsteps <<endl;
-  out_fourier<<"### initial time = "<< tau <<endl;
-  out_fourier<<"### 1- tau\t 2- pi_k(k)\t\t3-zeta(k)\t\t4-|k|\t\t 5-vec{k} \t 6-|k|^2"<<endl;
-
-
-  out_snapshots<<"### The result of the snapshots produced over time for blow-up \n### d tau = "<< dtau<<endl;
-  out_snapshots<<"### number of kessence update = "<<  sim.nKe_numsteps <<endl;
-  out_snapshots<<"### initial time = "<< tau <<endl;
-  out_snapshots<<"### 1- tau\t2- z \t3- a\t 4- zeta_avg\t 5- avg_pi\t 6- avg_phi\t 7- avg_det_gamma\t 8- H_conf/H0 \t 9- snap_count \t 10-cs2_full"<<endl;
-
-
-//defining the average
-double avg_pi = 0.;
-double avg_zeta = 0.;
-double avg_phi = 0.;
-double avg_det_gamma = 0.;
-double avg_cs2_full = 1.;
-double avg_pi_old = 0.;
-
-double max_pi = 0.;
-double max_pi_old = 0.;
-double max_zeta = 0.;
-double max_phi = 0.;
-
-int norm_kFT_squared = 0.;
-
-// HDF5 outputs!
-string str_filename ;
-string str_filename2 ;
-string str_filename3 ;
-string str_filename4 ;
-string str_filename5 ;
-#endif
-
-
 	while (true)    // main loop
 	{
-    //Kessence
-    #ifdef BACKREACTION_TEST
-  	for (x.first(); x.test(); x.next())
-  		{
-        // cout<<"tau: "<<tau<<" z: "<<1./(a) -1.<<endl;
-        //\Phi(n-1) = \Phi(old) and \Phi(n) which will be updated in this loops
-        // // Just note that in the first 2-3 steps it does not work since we
-  			// phi_old(x) =phi(x);
-  			// chi_old(x) =chi(x);
-        pi_k_old(x) = pi_k(x);
-        det_gamma_old (x) = det_gamma(x);
-  		}
-      //****************************
-      //****PRINTING AVERAGE OVER TIME
-      //****************************
-      // check_field(  zeta_half, 1. , " H pi_k", numpts3d);
-      avg_pi =average(  pi_k, Hconf(a, fourpiG,//TODO_EB
-			#ifdef HAVE_CLASS_BG
-				H_spline, acc
-			#else
-				cosmo
-			#endif
-				), numpts3d ) ;
-      avg_zeta =average( zeta_half,1., numpts3d ) ;
-      avg_phi =average(  phi , 1., numpts3d ) ;
-      avg_det_gamma =average(  det_gamma , 1., numpts3d ) ;
-      avg_cs2_full =average(  cs2_full , 1., numpts3d ) ;
 
-      max_pi =maximum(  pi_k, 1., numpts3d ) ;
-      max_pi_old =maximum(  pi_k_old, 1., numpts3d ) ;
-      max_zeta =maximum(  zeta_half,1., numpts3d ) ;
-      max_phi =maximum(  phi , 1., numpts3d ) ;
-
-      COUT << scientific << setprecision(8);
-      // if(parallel.isRoot())
-      // {
-        // fprintf(Result_avg,"\n %20.20e %20.20e ", tau, avg ) ;
-      out_avg<<setw(9) << tau <<"\t"<< setw(9) << avg_pi<<"\t"<< setw(9) << avg_zeta<<"\t"<< setw(9) << avg_det_gamma<<"\t"<< setw(9) << avg_phi<<"\t"<< setw(9) << 1./a -1.<<"\t"<< setw(9) << avg_cs2_full<<endl;
-
-        out_max<<setw(9) << tau <<"\t"<< setw(9) << max_pi<<"\t"<< setw(9) << max_zeta<<"\t"<< setw(9) << max_phi<<endl;
-
-      // }
-      //****************************
-      //****PRINTING REAL SPACE INFO
-      //****************************
-      for (x.first(); x.test(); x.next())
-    	{
-          //NL_test, Printing out average
-        if(x.coord(0)==32 && x.coord(1)==20 && x.coord(2)==10)
-        {
-          // if(parallel.isRoot())
-          // {
-          out_real<<setw(9) << tau <<"\t"<< setw(9) <<pi_k (x)<<"\t"<< setw(9)<<zeta_half (x)<<"\t"<<x<<endl;
-          // }
-        }
-    	}
-      //****************************
-      //FOURIER PRINTING
-      //****************************
-      for(kFT.first();kFT.test();kFT.next())
+    for (x.first(); x.test(); x.next())
       {
-        norm_kFT_squared= kFT.coord(0)*kFT.coord(0) + kFT.coord(1) * kFT.coord(1) + kFT.coord(2) * kFT.coord(2);
-        if(norm_kFT_squared == 1)
-        {
-          out_fourier<<setw(9) << tau <<"\t"<< setw(9) << scalarFT_pi(kFT)<<"\t"<< setw(9)<<scalarFT_zeta_half (kFT)<<"\t"<<kFT<<"\t"<<norm_kFT_squared<<endl;
-        }
+        chi_old(x) = chi(x);
+        phi_old(x) = phi(x);
       }
-      //**********************
-      //END ADDED************
-      //**********************
-#endif
 
 #ifdef BENCHMARK
 		cycle_start_time = MPI_Wtime();
@@ -815,60 +595,6 @@ string str_filename5 ;
 		ref_time = MPI_Wtime();
 #endif
 
-// NO k-essence projection
-// if (sim.Kess_source_gravity==1)
-// {
-// // Kessence projection Tmunu
-// // In the projection zeta_integer comes, since synched with particles..
-//  	if (sim.vector_flag == VECTOR_ELLIPTIC)
-// 		{
-// 			projection_Tmunu_kessence( T00_Kess,T0i_Kess,Tij_Kess, dx, a, phi, phi_old, 	chi, pi_k, zeta_half,
-// 				#ifdef HAVE_CLASS_BG
-// 				gsl_spline_eval(rho_smg_spline, a, acc)/gsl_spline_eval(rho_crit_spline, a, acc),
-// 				gsl_spline_eval(p_smg_spline, a, acc)/gsl_spline_eval(rho_smg_spline, a, acc),
-// 				gsl_spline_eval(cs2_spline, a, acc),
-// 				Hconf(a, fourpiG, H_spline, acc)
-// 				#else
-// 				cosmo.Omega_kessence,
-// 				cosmo.w_kessence,
-// 				cosmo.cs2_kessence,
-// 				Hconf(a, fourpiG, cosmo)
-// 				#endif
-// 				, fourpiG, sim.NL_kessence ,1 );
-// 		}
-//  	else
-// 		{
-// 			projection_Tmunu_kessence( T00_Kess,T0i_Kess,Tij_Kess, dx, a, phi, phi_old, 	chi, pi_k, zeta_half,
-// 				#ifdef HAVE_CLASS_BG
-// 				gsl_spline_eval(rho_smg_spline, a, acc)/gsl_spline_eval(rho_crit_spline, a, acc),
-// 				gsl_spline_eval(p_smg_spline, a, acc)/gsl_spline_eval(rho_smg_spline, a, acc),
-// 				gsl_spline_eval(cs2_spline, a, acc),
-// 				Hconf(a, fourpiG, H_spline, acc)
-// 				#else
-// 				cosmo.Omega_kessence,
-// 				cosmo.w_kessence,
-// 				cosmo.cs2_kessence,
-// 				Hconf(a, fourpiG, cosmo)
-// 				#endif
-// 				, fourpiG, sim.NL_kessence, 0 );
-// 		}
-//
-// 		for (x.first(); x.test(); x.next())
-// 		{
-//        // if(x.coord(0)==32 && x.coord(1)==12 && x.coord(2)==32)cout<<"T00: "<< T00_Kess(x)<<" Phi:"<<phi(x)<<endl;
-// 			// The coefficient is because it wanted to to be source according to eq C.2 of Gevolution paper
-// 			// Note that it is multiplied to dx^2 and is divived by -a^3 because of definition of T00 which is scaled by a^3
-// 			// We have T00 and Tij according to code's units, but source is important to calculate potentials and moving particles.
-// 			// There is coefficient between Tij and Sij as source.
-// 			source(x) += T00_Kess(x);
-// 			if (sim.vector_flag == VECTOR_ELLIPTIC)for(int 	c=0;c<3;c++)Bi(x,c)+=  T0i_Kess(x,c);
-// 			for(int c=0;c<6;c++)Sij(x,c)+=(2.) * Tij_Kess(x,c);
-//       // if(x.coord(0)==32 && x.coord(1)==20 && x.coord(2)==10)
-//       // {
-//       // cout<<"x"<<x<<"T00_Kess(x): "<<T00_Kess(x)<<endl;
-//       // }
-// 		}
-// }
 #ifdef BENCHMARK
 		kessence_update_time += MPI_Wtime() - ref_time;
 		ref_time = MPI_Wtime();
@@ -898,12 +624,7 @@ string str_filename5 ;
         #endif
           );
 
-        #ifdef BACKREACTION_TEST
-
-        prepareFTsource_BackReactionTest<Real>(short_wave, dx, phi, chi, source, cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo), source, 3. * Hc * dx * dx / dtau_old, fourpiG * dx * dx / a, 3. * Hc * Hc * dx * dx, sim.boxsize);  // prepare nonlinear source for phi update
-        #else
-        prepareFTsource<Real>(phi, chi, source, cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo), source, 3. * Hc * dx * dx / dtau_old, fourpiG * dx * dx / a, 3. * Hc * Hc * dx * dx);  // prepare nonlinear source for phi update
-        #endif
+    prepareFTsource<Real>(phi, chi, source, cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo), source, 3. * Hc * dx * dx / dtau_old, fourpiG * dx * dx / a, 3. * Hc * Hc * dx * dx);  // prepare nonlinear source for phi update
 
 #ifdef BENCHMARK
 				ref2_time= MPI_Wtime();
@@ -989,29 +710,6 @@ string str_filename5 ;
         #endif
         ), scalarFT(kFT).real(), T00hom);
         fclose(outfile);
-        // if (cycle == 0)
-				// 	fprintf(outfile, "# background statistics\n# cycle   tau/boxsize    a             conformal H/H0         Hconf_prime       phi(k=0)       T00(k=0)\n");
-				// fprintf(outfile, " %6d   %e   %e   %e   %e   %e   %e\n", cycle, tau, a, Hconf(a, fourpiG,//TODO_EB
-				// #ifdef HAVE_CLASS_BG
-				// 	H_spline, acc
-				// #else
-				// 	cosmo
-				// #endif
-				// ) /
-				// Hconf(1., fourpiG,//TODO_EB
-				// #ifdef HAVE_CLASS_BG
-				// 	H_spline, acc
-				// #else
-				// 	cosmo
-				// #endif
-				// ),Hconf_prime(a_kess, fourpiG,//TODO_EB
-				// #ifdef HAVE_CLASS_BG
-				// 	H_spline, acc
-				// #else
-				// 	cosmo
-				// #endif
-				// ), scalarFT(kFT).real(), T00hom);
-				// fclose(outfile);
 			}
 		}
 		// done recording background data
@@ -1133,7 +831,7 @@ ref_time = MPI_Wtime();
 #ifdef HAVE_CLASS
 				class_background, class_perturbs, ic,
 #endif
-				&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &pi_k,&zeta_half, &chi, &Bi, &T00_Kess, &T0i_Kess, &Tij_Kess ,&source, &Sij, &scalarFT, &scalarFT_pi, &scalarFT_zeta_half, &BiFT, &T00_KessFT, &T0i_KessFT, &Tij_KessFT, &SijFT, &plan_phi, &plan_pi_k , &plan_zeta_half, &plan_chi, &plan_Bi, &plan_T00_Kess, &plan_T0i_Kess, &plan_Tij_Kess, &plan_source, &plan_Sij
+				&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &pi_k, &zeta_half, &chi, &Bi, &T00_Kess, &T0i_Kess, &Tij_Kess ,&source, &Sij, &scalarFT, &scalarFT_pi, &scalarFT_zeta_half, &BiFT, &T00_KessFT, &T0i_KessFT, &Tij_KessFT, &SijFT, &plan_phi, &plan_pi_k , &plan_zeta_half, &plan_chi, &plan_Bi, &plan_T00_Kess, &plan_T0i_Kess, &plan_Tij_Kess, &plan_source, &plan_Sij
 #ifdef CHECK_B
 				, &Bi_check, &BiFT_check, &plan_Bi_check
 #endif
@@ -1245,11 +943,11 @@ ref_time = MPI_Wtime();
 //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)
 // EFT of k-essence theory
 //gravity theory = EFT &&  MG treatment   != hiclass
-if (cosmo.MG_theory == 1 && cosmo.kessence_theory == 0 && cosmo.MG_treatment==1  )
+if (cosmo.MG_theory == 1 && cosmo.MG_treatment==1  )
 {
   if(cycle==0)
   {
-  if(parallel.isRoot())  cout << "\033[1;34m The EFT approach equations including the MG part are being solved!\033[0m\n";
+  if(parallel.isRoot())  cout << "\033[1;34m The EFT approach equations including the MG part are being solved! n_field_update is set to: \033[0m "<<sim.nKe_numsteps<<endl;
   }
   //**********************
   //Kessence - LeapFrog:START
@@ -1258,14 +956,11 @@ if (cosmo.MG_theory == 1 && cosmo.kessence_theory == 0 && cosmo.MG_treatment==1 
     //First we update zeta_half to have it at -1/2 just in the first loop
     if(cycle==0)
     {
-      for (i=0;i<sim.nKe_numsteps;i++)
-      {
-       update_pi_prime_EFT(-dtau/ (2. * sim.nKe_numsteps), dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half, deltaPm, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), fourpiG, gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
+       update_pi_prime_EFT(-dtau/ (2. * sim.nKe_numsteps), dx, a_kess, fourpiG, gsl_spline_eval(H_spline, 1., acc), phi, phi_old, chi, chi_old, pi_k, zeta_half, deltaPm, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(H_prime_prime_spline, a_kess, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_prime_spline, a_kess, acc), gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
        zeta_half.updateHalo();
-      }
     }
 
-   //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)
+   //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)]
    for (i=0;i<sim.nKe_numsteps;i++)
    {
       //********************************************************************************
@@ -1276,7 +971,7 @@ if (cosmo.MG_theory == 1 && cosmo.kessence_theory == 0 && cosmo.MG_treatment==1 
       //We also update zeta_int from n to n+1
       //********************************************************************************
 
-      update_pi_prime_EFT(dtau/ sim.nKe_numsteps, dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half, deltaPm, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), fourpiG, gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
+      update_pi_prime_EFT(dtau/ sim.nKe_numsteps,  dx, a_kess, fourpiG, gsl_spline_eval(H_spline, 1., acc), phi, phi_old, chi, chi_old, pi_k, zeta_half, deltaPm, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(H_prime_prime_spline, a_kess, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_prime_spline, a_kess, acc), gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
       zeta_half.updateHalo();
       //********************************************************************************
       //Since we have pi(n+1)=pi(n) + pi'(n+1/2), and in pi'(n+1/2) we have H(n+1/2) we update the background before updating the pi to have H(n+1/2), Moreover zeta(n+1) = zeta(n+1/2) + zeta'(n+1/2), so we put zeta_int updating in the pi updating!
@@ -1305,45 +1000,6 @@ if (cosmo.MG_theory == 1 && cosmo.kessence_theory == 0 && cosmo.MG_treatment==1 
          cosmo,
        #endif
        dtau  / sim.nKe_numsteps / 2.0);
-      #ifdef BACKREACTION_TEST
-        avg_zeta =average(  zeta_half,1., numpts3d ) ;
-        // avg_zeta_old =average(  zeta_half_old,1., numpts3d ) ;
-        avg_pi =average(  pi_k,1., numpts3d ) ;
-        avg_phi =average(  phi , 1., numpts3d ) ;
-        avg_pi_old =average(  pi_k_old, 1., numpts3d ) ;
-
-        if (avg_zeta > 4.e-7 && abs(avg_pi/avg_pi_old)>1.015 && snapcount_b< sim.num_snapshot_kess )
-        {
-        if(parallel.isRoot())  cout << "\033[1;32mThe blowup criteria for EFT equations are met, the requested snapshots being produced\033[0m\n";
-          writeSpectra(sim, cosmo, fourpiG, a, snapcount_b,
-            #ifdef HAVE_CLASS
-                   class_background, class_perturbs, ic,
-            #endif
-                    &pcls_cdm, &pcls_b, pcls_ncdm, &phi,&pi_k, &zeta_half, &chi, &Bi,&T00_Kess, &T0i_Kess, &Tij_Kess, &source, &Sij, &scalarFT ,&scalarFT_pi, &scalarFT_zeta_half, &BiFT, &T00_KessFT, &T0i_KessFT, &Tij_KessFT, &SijFT, &plan_phi, &plan_pi_k, &plan_zeta_half, &plan_chi, &plan_Bi, &plan_T00_Kess, &plan_T0i_Kess, &plan_Tij_Kess, &plan_source, &plan_Sij);
-            str_filename =  "./output/pi_k_" + to_string(snapcount_b) + ".h5";
-            str_filename2 = "./output/zeta_" + to_string(snapcount_b) + ".h5";
-            str_filename3 = "./output/phi_" + to_string(snapcount_b) + ".h5";
-            pi_k.saveHDF5(str_filename);
-            zeta_half.saveHDF5(str_filename2);
-            phi.saveHDF5(str_filename3);
-            snapcount_b++;
-
-            out_snapshots<<setw(9) << tau + dtau/sim.nKe_numsteps <<"\t"<< setw(9) << 1./(a_kess) -1.0 <<"\t"<< setw(9) << a_kess <<"\t"<< setw(9) << avg_zeta <<"\t"<< setw(9) << avg_pi <<"\t"<< setw(9) << avg_phi <<"\t"<< setw(9) <<tau <<"\t"<< setw(9) << Hconf(a_kess, fourpiG,//TODO_EB
-           #ifdef HAVE_CLASS_BG
-             H_spline, acc
-           #else
-             cosmo
-           #endif
-         ) / Hconf(1., fourpiG,//TODO_EB
-           #ifdef HAVE_CLASS_BG
-             H_spline, acc
-           #else
-             cosmo
-           #endif
-           ) <<"\t"<< setw(9) <<snapcount_b  <<endl;
-          }
-
-      #endif
       }
 
 
@@ -1354,322 +1010,8 @@ if (cosmo.MG_theory == 1 && cosmo.kessence_theory == 0 && cosmo.MG_treatment==1 
   //**********************
   //EFT evolution - LeapFrog: End
   //**********************
-
 }
 
-
-
- //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)
- // k-essence theory
- //gravity theory = k-essence &&  MG treatment   != hiclass
- if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 2  )
- {
-   if(cycle==0)
-   {
-   if(parallel.isRoot())  cout << "\033[1;34mThe k-essence - EFT approach equations including the MG part are being solved in k-evolution!\033[0m\n";
-   }
-   //**********************
-   //Kessence - LeapFrog:START
-   //**********************
-     double a_kess=a;
-     //First we update zeta_half to have it at -1/2 just in the first loop
-     if(cycle==0)
-     {
-       for (i=0;i<sim.nKe_numsteps;i++)
-       {
-         //computing zeta_half(-1/2) and zeta_int(-1) but we do not work with zeta(-1)
-         update_zeta(-dtau/ (2. * sim.nKe_numsteps) , dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half,
-   				#ifdef HAVE_CLASS_BG
-   				gsl_spline_eval(rho_smg_spline, a_kess, acc)/gsl_spline_eval(rho_crit_spline, a_kess, acc),
-   				gsl_spline_eval(p_smg_spline, a_kess, acc)/gsl_spline_eval(rho_smg_spline, a_kess, acc),
-   				gsl_spline_eval(cs2_spline, a_kess, acc),
-          0., // TODO: FH  "s" should be provided from hiclass columns
-   				Hconf(a_kess, fourpiG, H_spline, acc),
-   				Hconf_prime(a_kess, fourpiG, H_spline, acc)
-   				#else
-   				cosmo.Omega_kessence,
-   				cosmo.w_kessence,
-   				cosmo.cs2_kessence,
-          ,0.0, // s parameter (FH:todo) should be read from hiclass as well as other params
-   				Hconf(a_kess, fourpiG, cosmo),
-   				Hconf_prime(a_kess, fourpiG, cosmo)
-   				#endif
-   				, sim.NL_kessence);
-         // zeta_integer.updateHalo();
-         zeta_half.updateHalo();
-       }
-     }
-
-    //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)
-   	for (i=0;i<sim.nKe_numsteps;i++)
-   	{
-       //********************************************************************************
-       //Updating zeta_integer to get zeta_integer(n+1/2) and zeta_integer(n+1), in the first loop is getting zeta_integer(1/2) and zeta_integer(1)
-       // In sum: zeta_integer(n+1/2) = zeta_integer(n-1/2)+ zeta_integer'(n)dtau which needs background to be at n with then
-       //Note that here for zeta_integer'(n) we need background to be at n and no need to update it.
-       //\zeta_integer(n+1/2) = \zeta_integer(n-1/2) + \zeta_integer'(n)  dtau
-       //We also update zeta_int from n to n+1
-       //********************************************************************************
-       update_zeta(dtau/ sim.nKe_numsteps, dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half,
-   			#ifdef HAVE_CLASS_BG
-   			gsl_spline_eval(rho_smg_spline, a_kess, acc)/gsl_spline_eval(rho_crit_spline, a_kess, acc),
-   			gsl_spline_eval(p_smg_spline, a_kess, acc)/gsl_spline_eval(rho_smg_spline, a_kess, acc),
-   			gsl_spline_eval(cs2_spline, a_kess, acc),
-          0., // TODO: FH  "s" should be provided from hiclass columns
-   			Hconf(a_kess, fourpiG, H_spline, acc),
-   			Hconf_prime(a_kess, fourpiG, H_spline, acc)
-   			#else
-   			cosmo.Omega_kessence,
-   			cosmo.w_kessence,
-   			cosmo.cs2_kessence,
-        ,0.0, // s parameter (FH:todo) should be read from hiclass as well as other params
-   			Hconf(a_kess, fourpiG, cosmo),
-   			Hconf_prime(a_kess, fourpiG, cosmo)
-   			#endif
-   			, sim.NL_kessence);
-       // zeta_integer.updateHalo();
-       zeta_half.updateHalo();
-       //********************************************************************************
-       //Since we have pi(n+1)=pi(n) + pi'(n+1/2), and in pi'(n+1/2) we have H(n+1/2) we update the background before updating the pi to have H(n+1/2), Moreover zeta(n+1) = zeta(n+1/2) + zeta'(n+1/2), so we put zeta_int updating in the pi updating!
-       //********************************************************************************
-   		rungekutta4bg(a_kess, fourpiG,
-   			#ifdef HAVE_CLASS_BG
-   				H_spline, acc,
-   			#else
-   				cosmo,
-   			#endif
-   			dtau  / sim.nKe_numsteps / 2.0);
-       //********************************************************************************
-       //we update pi to have it at n+1 (at first loop from the value at (0) and the value of zeta_integer at 1/2 and H(n+1/2) we update pi at (1))
-       //In the pi update we also update zeta_int because we need the values of a_kess and H_kess at step n+1/2
-       //By the below update we get pi(n+1) and zeta(n+1)
-       //********************************************************************************
-       update_pi_k(dtau/ sim.nKe_numsteps, dx, a_kess, phi, phi_old, chi, chi_old, pi_k, zeta_half,
-   			#ifdef HAVE_CLASS_BG
-   			gsl_spline_eval(rho_smg_spline, a_kess, acc)/gsl_spline_eval(rho_crit_spline, a_kess, acc),
-   			gsl_spline_eval(p_smg_spline, a_kess, acc)/gsl_spline_eval(rho_smg_spline, a_kess, acc),
-   			gsl_spline_eval(cs2_spline, a_kess, acc),
-   			Hconf(a_kess, fourpiG, H_spline, acc),
-   			Hconf_prime(a_kess, fourpiG, H_spline, acc)
-   			#else
-   			cosmo.Omega_kessence,
-   			cosmo.w_kessence,
-   			cosmo.cs2_kessence,
-   			Hconf(a_kess, fourpiG, cosmo),
-   			Hconf_prime(a_kess, fourpiG, cosmo)
-   			#endif
-   			, sim.NL_kessence); // H_old is updated here in the function
-   		pi_k.updateHalo();
-
-       //********************************************************************************
-       // Now we have pi(n+1) and a_kess(n+1/2) so we update background by halfstep to have a_kess(n+1)
-       //********************************************************************************
-   		rungekutta4bg(a_kess, fourpiG,
-   			#ifdef HAVE_CLASS_BG
-   				H_spline, acc,
-   			#else
-   				cosmo,
-   			#endif
-   			dtau  / sim.nKe_numsteps / 2.0);
-       #ifdef BACKREACTION_TEST
-         //   //Make snapshots and power arround blowup TIME
-         // max_zeta =maximum(  zeta_half, Hconf(a, fourpiG,//TODO_EB
-   			// #ifdef HAVE_CLASS_BG
-   			// 	H_spline, acc
-   			// #else
-   			// 	cosmo
-   			// #endif
-   			// ), numpts3d ) ;
-         // // max_zeta_old =maximum(  zeta_half_old, Hconf(a, fourpiG,//TODO_EB
-   			// #ifdef HAVE_CLASS_BG
-   			// 	H_spline, acc
-   			// #else
-   			// 	cosmo
-   			// #endif
-   			// ), numpts3d ) ;
-         avg_zeta =average(  zeta_half,1., numpts3d ) ;
-         // avg_zeta_old =average(  zeta_half_old,1., numpts3d ) ;
-         avg_pi =average(  pi_k,1., numpts3d ) ;
-         avg_phi =average(  phi , 1., numpts3d ) ;
-         avg_pi_old =average(  pi_k_old, 1., numpts3d ) ;
-
-         if (avg_zeta > 4.e-7 && abs(avg_pi/avg_pi_old)>1.015 && snapcount_b< sim.num_snapshot_kess )
-         {
-         if(parallel.isRoot())  cout << "\033[1;32mThe blowup criteria for EFT equations are met, the requested snapshots being produced\033[0m\n";
-           writeSpectra(sim, cosmo, fourpiG, a, snapcount_b,
-             #ifdef HAVE_CLASS
-             				class_background, class_perturbs, ic,
-             #endif
-                     &pcls_cdm, &pcls_b, pcls_ncdm, &phi,&pi_k, &zeta_half, &chi, &Bi,&T00_Kess, &T0i_Kess, &Tij_Kess, &source, &Sij, &scalarFT ,&scalarFT_pi, &scalarFT_zeta_half, &BiFT, &T00_KessFT, &T0i_KessFT, &Tij_KessFT, &SijFT, &plan_phi, &plan_pi_k, &plan_zeta_half, &plan_chi, &plan_Bi, &plan_T00_Kess, &plan_T0i_Kess, &plan_Tij_Kess, &plan_source, &plan_Sij);
-             str_filename =  "./output/pi_k_" + to_string(snapcount_b) + ".h5";
-             str_filename2 = "./output/zeta_" + to_string(snapcount_b) + ".h5";
-             str_filename3 = "./output/phi_" + to_string(snapcount_b) + ".h5";
-             pi_k.saveHDF5(str_filename);
-             zeta_half.saveHDF5(str_filename2);
-             phi.saveHDF5(str_filename3);
-             // str_filename =  "./output/pi_k_" + to_string(snapcount_b-1) + ".h5";
-             // str_filename2 = "./output/zeta_" + to_string(snapcount_b-1) + ".h5";
-             // pi_k_old.saveHDF5(str_filename);
-             // zeta_half_old.saveHDF5(str_filename2);
-             snapcount_b++;
-
-           //****************************
-           //****PRINTING snapshots info
-           //****************************
-             // COUT << scientific << setprecision(8);
-             // if(parallel.isRoot())
-             // {
-             // out_snapshots<<"### 1- tau\t2- z \t3- a\t 4- zeta_avg\t 5- avg_pi\t 6- avg_phi\t 7- tau/boxsize\t 8- H_conf/H0 \t 9- snap_count"<<endl;
-
-             out_snapshots<<setw(9) << tau + dtau/sim.nKe_numsteps <<"\t"<< setw(9) << 1./(a_kess) -1.0 <<"\t"<< setw(9) << a_kess <<"\t"<< setw(9) << avg_zeta <<"\t"<< setw(9) << avg_pi <<"\t"<< setw(9) << avg_phi <<"\t"<< setw(9) <<tau <<"\t"<< setw(9) << Hconf(a_kess, fourpiG,//TODO_EB
-   					#ifdef HAVE_CLASS_BG
-   						H_spline, acc
-   					#else
-   						cosmo
-   					#endif
-   				) / Hconf(1., fourpiG,//TODO_EB
-   					#ifdef HAVE_CLASS_BG
-   						H_spline, acc
-   					#else
-   						cosmo
-   					#endif
-   					) <<"\t"<< setw(9) <<snapcount_b  <<endl;
-           }
-
-       #endif
-       }
-
-
-   #ifdef BENCHMARK
-       kessence_update_time += MPI_Wtime() - ref_time;
-       ref_time = MPI_Wtime();
-   #endif
-   //**********************
-   //Kessence - LeapFrog: End
-   //**********************
-
- }
-
-  #ifdef BACKREACTION_TEST
-    // Fundamental k-essence theory  cosmo.MGtheory == 1
-    if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 2 )
-    {
-      double a_kess=a;
-      if(cycle==0)
-      {
-      if(parallel.isRoot())  cout << "\033[1;34mThe fundamental theory is being solved!\033[0m\n";
-      }
-    //********************************************************************************
-    // Euler algorithm
-    //********************************************************************************
-    update_pi_dot_full(dtau/ sim.nKe_numsteps, dx, a_kess,pi_k, zeta_half, det_gamma, cs2_full, cosmo.X_hat, cosmo.g0, cosmo.g2, cosmo.g4,
-     #ifdef HAVE_CLASS_BG
-     Hconf(a_kess, fourpiG, H_spline, acc)
-     #else
-     Hconf(a_kess, fourpiG, cosmo)
-     #endif
-      );
-    zeta_half.updateHalo();
-    // Although it's an Euler algorithm we can update the BG part twice in each step to increase the precision!
-    rungekutta4bg(a_kess, fourpiG,
-			#ifdef HAVE_CLASS_BG
-				H_spline, acc,
-			#else
-				cosmo,
-			#endif
-			dtau  / sim.nKe_numsteps / 2.0);
-
-    update_pi_full(dtau/ sim.nKe_numsteps, pi_k, zeta_half); // H_old is updated here in the function
-		pi_k.updateHalo();
-    rungekutta4bg(a_kess, fourpiG,
-      #ifdef HAVE_CLASS_BG
-        H_spline, acc,
-      #else
-        cosmo,
-      #endif
-      dtau  / sim.nKe_numsteps / 2.0);
-
-      //   //Make snapshots and power arround blowup TIME
-      // // max_zeta =maximum(  zeta_half, Hconf(a, fourpiG, cosmo), numpts3d ) ;
-      // max_zeta_old =maximum(  zeta_half_old, Hconf(a, fourpiG, cosmo), numpts3d ) ;
-      avg_zeta =average(  zeta_half,1., numpts3d ) ;
-      avg_pi =average(  pi_k,1., numpts3d ) ;
-      avg_det_gamma =average(  det_gamma , 1., numpts3d ) ;
-      avg_cs2_full = average (cs2_full, 1., numpts3d);
-      avg_phi =average(  phi , 1., numpts3d ) ;
-      avg_pi_old =average(  pi_k_old, 1., numpts3d ) ;
-
-      for (x.first(); x.test(); x.next())
-      {
-          if (det_gamma_old (x) * det_gamma(x) < 0)
-          {
-            if(parallel.isRoot())
-            {
-              cout << "\033[1;32mThe determinant has changed sign at \033[0m"  <<x<<" z: "<<1./a -1.<<endl;
-            // str_filename =  "./output/pi_negative_det_" + to_string(snapcount_b) + ".h5";
-            break;
-            }
-            // str_filename2 = "./output/zeta_" + to_string(snapcount_b) + ".h5";
-            // str_filename3 = "./output/det_gamma_negative_det_" + to_string(snapcount_b) + ".h5";
-            // str_filename4 = "./output/cs2_full_negative_det_" + to_string(snapcount_b) + ".h5";
-            // // str_filename5 = "./output/phi_" + to_string(snapcount_b) + ".h5";
-            // pi_k.saveHDF5(str_filename);
-            // // zeta_half.saveHDF5(str_filename2);
-            // det_gamma.saveHDF5(str_filename3);
-            // cs2_full.saveHDF5(str_filename4);
-          }
-      }
-
-      if (a>1./(1+1.0) && a<1./(1+0.907858) && snapcount_b< sim.num_snapshot_kess )
-      {
-        dtau = dtau * 0.3;
-      if(parallel.isRoot())  cout << "\033[1;32mThe blowup criteria for the fundamental theory are met, the requested snapshots being produced\033[0m\n";
-                // writeSpectra(sim, cosmo, fourpiG, a, snapcount_b,
-                // #ifdef HAVE_CLASS
-                // class_background, class_perturbs, ic,
-                // #endif
-                // &pcls_cdm, &pcls_b, pcls_ncdm, &phi,&pi_k, &zeta_half, &chi, &Bi,&T00_Kess, &T0i_Kess, &Tij_Kess, &source, &Sij, &scalarFT ,&scalarFT_pi, &scalarFT_zeta_half, &BiFT, &T00_KessFT, &T0i_KessFT, &Tij_KessFT, &SijFT, &plan_phi, &plan_pi_k, &plan_zeta_half, &plan_chi, &plan_Bi, &plan_T00_Kess, &plan_T0i_Kess, &plan_Tij_Kess, &plan_source, &plan_Sij);
-          str_filename =  "./output/pi_k_" + to_string(snapcount_b) + ".h5";
-          str_filename2 = "./output/zeta_" + to_string(snapcount_b) + ".h5";
-          str_filename3 = "./output/det_gamma_" + to_string(snapcount_b) + ".h5";
-          str_filename4 = "./output/cs2_full_" + to_string(snapcount_b) + ".h5";
-          str_filename5 = "./output/phi_" + to_string(snapcount_b) + ".h5";
-          pi_k.saveHDF5(str_filename);
-          zeta_half.saveHDF5(str_filename2);
-          det_gamma.saveHDF5(str_filename3);
-          cs2_full.saveHDF5(str_filename4);
-          phi.saveHDF5(str_filename5);
-
-          snapcount_b++;
-
-        //****************************
-        //****PRINTING snapshots info
-        //****************************
-          // COUT << scientific << setprecision(8);
-          // if(parallel.isRoot())
-          // {
-          // out_snapshots<<"### 1- tau\t2- z \t3- a\t 4- zeta_avg\t 5- avg_pi\t 6- avg_phi\t 7- avg(det)\t 8- H_conf/H0 \t 9- snap_count"<<endl;
-
-          out_snapshots<<setw(9) << tau + dtau/sim.nKe_numsteps <<"\t"<< setw(9) << 1./(a_kess) -1.0 <<"\t"<< setw(9) << a_kess <<"\t"<< setw(9) << avg_zeta <<"\t"<< setw(9) << avg_pi <<"\t"<< setw(9) << avg_phi <<"\t"<< setw(9) <<tau <<"\t"<< setw(9) << Hconf(a_kess, fourpiG,//TODO_EB
-          #ifdef HAVE_CLASS_BG
-            H_spline, acc
-          #else
-            cosmo
-          #endif
-          ) / Hconf(1., fourpiG,//TODO_EB
-          #ifdef HAVE_CLASS_BG
-            H_spline, acc
-          #else
-            cosmo
-          #endif
-        ) <<"\t"<< setw(9) <<snapcount_b <<"\t"<< setw(9) << avg_cs2_full <<endl;
-          }
-
-
-
-    // Fundamental k-essence theory  END
-    }
-    #endif
 
 #ifdef BENCHMARK
     kessence_update_time += MPI_Wtime() - ref_time;
