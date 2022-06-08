@@ -63,14 +63,14 @@
 #define MASK_XSPEC  2048
 #define MASK_DELTA  4096
 #define MASK_DBARE  8192
-#define MASK_PI_K    16384
-#define MASK_ZETA    32768
+#define MASK_PI_MG    16384
+#define MASK_PI_MG_PRIME    32768
 #define MASK_MULTI  65536
 #define MASK_VEL    131072
-#define MASK_T_KESS 262144
-#define MASK_Delta_KESS 524288
+#define MASK_T_MG 262144
+#define MASK_DELTA_MG 524288
 #define MASK_PHI_PRIME 1048576
-#define MASK_DELTAKESS_DELTA 2097152
+#define MASK_DELTA_MG_DELTA 2097152
 
 
 #define ICFLAG_CORRECT_DISPLACEMENT 1
@@ -218,7 +218,7 @@ struct metadata
 	int out_snapshot;
 	int out_lightcone[MAX_OUTPUTS];
   //Kessence
-  int num_snapshot_kess;
+  int num_snapshot_mg;
 	int num_pk;
 	int numbins;
 	int num_snapshot;
@@ -249,11 +249,6 @@ struct metadata
 	char output_path[PARAM_MAX_LENGTH];
 	char restart_path[PARAM_MAX_LENGTH];
 	char basename_restart[PARAM_MAX_LENGTH];
-	//Kessence part
-	int nKe_numsteps;
-	int Kess_source_gravity;
-  int NL_kessence;
-	//kessence end
 };
 
 struct icsettings
@@ -263,13 +258,13 @@ struct icsettings
 	int flags;
 	int generator;
 	int restart_cycle;
-  int IC_MG ; // Initial conditions for kessence fields (pi,zeta); 1 is from CLASS/hiclass and 0 is provided by hand
+  int IC_mg ; // Initial conditions for MG fields (pi,pi_prime); 1 is from CLASS/hiclass and 0 is provided by hand
 	char pclfile[MAX_PCL_SPECIES][PARAM_MAX_LENGTH];
 	char pkfile[PARAM_MAX_LENGTH];
 	char tkfile[PARAM_MAX_LENGTH];
-	//Kessence
-	char tk_kessence[PARAM_MAX_LENGTH];
-	//kessence end
+	//MG
+	char tk_mg[PARAM_MAX_LENGTH];
+	//MG end
 	char metricfile[3][PARAM_MAX_LENGTH];
 	double restart_tau;
 	double restart_dtau;
@@ -290,21 +285,26 @@ struct cosmology
 	double Omega_m;
 	double Omega_Lambda;
 
-  int kessence_theory; // 0 means no kessence, 1 means k-essence covariant equation
+  // int kessence_theory; // 0 means no kessence, 1 means k-essence covariant equation
 
- 	// Kessence EFT
-	double Omega_kessence;
-  double w_kessence;
-	double cs2_kessence;
+ 	// // Kessence EFT
+	// double Omega_kessence;
+  // double w_kessence;
+	// double cs2_kessence;
   // Fundamental k-essence
-  double X_hat;
-  double g0;
-  double g2;
-  double g4;
+  // double X_hat;
+  // double g0;
+  // double g2;
+  // double g4;
 
   // EFT parameters
-  int MG_theory; // 0 means no MG, 1 is EFT and 2 is k-essence //Todo is ... (will be added)
-  int MG_treatment=1; // 0 means hiclass-interface 1 is being solved here
+  int theory_mg; // 0 means no MG, 1 is EFT  //Todo is ... (will be added)
+  int treatment_mg=1; // 0 means hiclass-interface 1 is being solved here
+  int NL_mg;
+  //MG part
+  int n_mg_numsteps;
+  int mg_source_gravity;
+  //MG end
   double bg_i[3];
   double Omega_mg;
   double w0_mg;
@@ -318,9 +318,9 @@ struct cosmology
   double M_star_ini = 1.0;
   // fld CLASS
   double Omega_fld=0.0;
-	double w0_fld=0.0;
-	double wa_fld=0.0;
-	double cs2_fld=1.0;
+	double w0_fld=-1;
+	double wa_fld=0;
+	double cs2_fld=1;
 	//kessence end
 	double Omega_g;
 	double Omega_ur;

@@ -262,10 +262,10 @@ void prepareFTsource(Field<FieldType> & phi, Field<FieldType> & Tij, Field<Field
 
 
 //////////////////////////
-//Kessence Stress tensor
+//mgence Stress tensor
 //////////////////////////
 // Description:
-//   Kessence field projection for Tmunu
+//   mgence field projection for Tmunu
 //
 // Arguments:
 //   T00        pointer to target field
@@ -294,7 +294,7 @@ void prepareFTsource(Field<FieldType> & phi, Field<FieldType> & Tij, Field<Field
 //
 //////////////////////////
 template <class FieldType>
-void projection_Tmunu_kessence( Field<FieldType> & T00, Field<FieldType> & T0i, Field<FieldType> & Tij,
+void projection_Tmunu_mg( Field<FieldType> & T00, Field<FieldType> & T0i, Field<FieldType> & Tij,
    double dx, double a, Field<FieldType> & phi,Field<FieldType> & phi_old, Field<FieldType> & chi, Field<FieldType> & pi_k, Field<FieldType> & zeta_half, double Omega_fld , double w, double cs2, double Hcon, double fourpig, int non_linearity ,int method )
 {
     Site xField(phi.lattice());
@@ -492,13 +492,6 @@ void projection_Tmunu_kessence( Field<FieldType> & T00, Field<FieldType> & T0i, 
     sum /= n3;
     hom /= n3;
     return max * constant;
-    // COUT << scientific << setprecision(6);
-    // COUT << message
-    // << setw(17) << field_name
-    // << " Max = " << setw(9) << max * constant
-    // << " hom = " << setw(9) << hom * constant
-    // << endl;
-    // cout.flags(f);
     }
 
 #endif
@@ -517,7 +510,7 @@ void projection_Tmunu_kessence( Field<FieldType> & T00, Field<FieldType> & T0i, 
 // Arguments:
 //   phi        reference to field configuration
 //   pi_k       reference to k-essence field
-//   pi_dot      reference to pi_dot of kessence at (n+1/2)
+//   pi_dot      reference to pi_dot of mg at (n+1/2)
 // Returns:
 //
 //////////////////////////
@@ -561,6 +554,7 @@ void update_pi_prime_EFT(double dtau, double dx, double a, double fourpiG, doubl
   alpha_B_prime = alpha_B_prime * sqrt(2./3.*fourpiG)/H0_hiclass; // alpha_B_prime[gevolution]  = alpha_B_prime[hiclass ][1/Mpc] * H_0 [gevolution]/ H_0 [hiclass]
   alpha_K_prime = alpha_K_prime * sqrt(2./3.*fourpiG)/H0_hiclass;
   P_s_prime= P_s_prime * density_norm * sqrt(2./3.*fourpiG)/H0_hiclass; // density norm as well as the derivative unit consideration
+  Hconf_prime = Hconf_prime_prime * (2./3.*fourpiG)/H0_hiclass/H0_hiclass; // H[1/Mpc^2]
   Hconf_prime_prime = Hconf_prime_prime * (2./3.*fourpiG)* sqrt(2./3.*fourpiG)/H0_hiclass/H0_hiclass/H0_hiclass; // H''[1/Mpc^3]
   A_Laplace_chi = alpha_B * Hconf;
   A_Laplace_phi = -alpha_B * Hconf;
@@ -569,10 +563,16 @@ void update_pi_prime_EFT(double dtau, double dx, double a, double fourpiG, doubl
   A_deltaPm = -3.0 * alpha_B * Hconf * a * a/(2.0 * Mpl2);
   A_phi_prime =  3. * Hconf * Hconf * (alpha_B - alpha_B * alpha_B/2. - alpha_K/3. - alpha_B_prime/Hconf - alpha_B * Hconf_prime/Hconf/Hconf -  a * a * (rho_s + P_s)/(Mpl2 * Hconf * Hconf));
   A_Laplace_pi = - (Hconf * alpha_B_prime + alpha_B * Hconf_prime) - a * a * (rho_s + P_s)/Mpl2;
-  A_pi_prime =  3. * Hconf * Hconf * Hconf * (3. * alpha_B * alpha_B/2. + 2. * alpha_K/3.
+  A_pi_prime = 3. * Hconf * Hconf * Hconf * (3. * alpha_B * alpha_B/2. + 2. * alpha_K/3.
                 + alpha_B * alpha_B_prime/(2. * Hconf) + 2. * alpha_K_prime/(3. * Hconf)
                 +  alpha_B * alpha_B * Hconf_prime/(2. * Hconf * Hconf) + 2. * alpha_K * Hconf_prime/(3. * Hconf * Hconf)
                 +  ( Hconf * Hconf + Hconf_prime) - a * a * alpha_B *  (rho_s + P_s)/(2. * Hconf * Hconf* Mpl2));
+  // (3./2.) * Hconf * Hconf * Hconf * alpha_B * alpha_B * (3. + alpha_B_prime/(Hconf * alpha_B) + Hconf_prime/Hconf/Hconf - a * a *  (rho_s + P_s)/(Hconf * Hconf * Mpl2 * alpha_B)) + 2. * alpha_K * Hconf * Hconf * Hconf * (1. + alpha_K_prime/2./alpha_K/Hconf + Hconf_prime/Hconf/Hconf);
+  // 3. * Hconf * Hconf * Hconf * (3. * alpha_B * alpha_B/2. + 2. * alpha_K/3.
+  //               + alpha_B * alpha_B_prime/(2. * Hconf) + 2. * alpha_K_prime/(3. * Hconf)
+  //               +  alpha_B * alpha_B * Hconf_prime/(2. * Hconf * Hconf) + 2. * alpha_K * Hconf_prime/(3. * Hconf * Hconf)
+  //               +  ( Hconf * Hconf + Hconf_prime) - a * a * alpha_B *  (rho_s + P_s)/(2. * Hconf * Hconf* Mpl2));
+
   A_chi = 3. * Hconf * Hconf * Hconf * (-alpha_B +  alpha_B * alpha_B + alpha_K/3.
                 +  alpha_B_prime/Hconf + alpha_B * alpha_B_prime/(2. * Hconf) + alpha_K_prime/(3. * Hconf)
                 +  alpha_B * Hconf_prime/(Hconf * Hconf)
@@ -585,7 +585,6 @@ void update_pi_prime_EFT(double dtau, double dx, double a, double fourpiG, doubl
                 + a * a * (1 - alpha_B/2.) *  (rho_s + P_s)/( Hconf * Hconf* Mpl2));
 
   A_pi = 3.0 * Hconf * Hconf * Hconf * Hconf * (alpha_B * alpha_B + alpha_K/3. - alpha_B * Hconf_prime_prime/(Hconf * Hconf * Hconf) + alpha_B_prime/Hconf + alpha_B * alpha_B_prime/(2. * Hconf) + alpha_K_prime/(3. * Hconf) + 3. * alpha_B * Hconf_prime/(Hconf * Hconf) + alpha_B * alpha_B * Hconf_prime/(Hconf * Hconf) + alpha_K * Hconf_prime/(Hconf * Hconf) - alpha_B_prime * Hconf_prime/(Hconf * Hconf * Hconf) - alpha_B * Hconf_prime * Hconf_prime/(Hconf * Hconf * Hconf * Hconf) +  a * a * (1. - alpha_B/2.) * (rho_s + P_s)/( Hconf * Hconf* Mpl2)  - a * a * (rho_s * Hconf_prime + P_s * Hconf_prime + P_s_prime * alpha_B/2.)/( Hconf * Hconf * Hconf * Hconf * Mpl2) );
-
 
   Site x(pi.lattice());
   for (x.first(); x.test(); x.next())
@@ -614,450 +613,22 @@ void update_pi_prime_EFT(double dtau, double dx, double a, double fourpiG, doubl
       Laplace_phi+=phi(x+2) + phi(x-2) - 2. * phi(x);
       Laplace_phi= Laplace_phi/(dx*dx);
 
-      RHS = A_pi * pi(x) +  A_chi * chi(x) + A_phi * phi(x) + A_pi_prime * pi_prime(x)  + A_chi_prime * (chi(x) -chi_old(x))/dtau  + A_phi_prime * (phi(x) - phi_old(x))/dtau + A_Laplace_pi * Laplace_pi + A_Laplace_chi * Laplace_chi  + A_Laplace_phi * Laplace_phi + A_deltaPm * deltaPm(x); // We have to remove phi'' from the equations!
-    pi_prime(x) = pi_prime(x) * (1. - dtau * A_pi_prime/(A_pi_prime_prime)) - (dtau/(A_pi_prime_prime * (1 + dtau * A_pi_prime/(2.0 * A_pi_prime_prime)) ) ) * RHS;
+      RHS = -(A_pi * pi(x) +  A_chi * chi(x) + A_phi * phi(x) + A_pi_prime * pi_prime(x) + A_chi_prime * (chi(x) -chi_old(x))/dtau  + A_phi_prime * (phi(x) - phi_old(x))/dtau + A_Laplace_pi * Laplace_pi + A_Laplace_chi * Laplace_chi  + A_Laplace_phi * Laplace_phi) + A_deltaPm * deltaPm(x); // We have to remove phi'' from the equations!
+    // pi_prime(x) = pi_prime(x) * (1. - dtau * A_pi_prime/(A_pi_prime_prime)) - (dtau/(A_pi_prime_prime * (1 + dtau * A_pi_prime/(2.0 * A_pi_prime_prime)) ) ) * RHS;
+    pi_prime(x) = pi_prime(x)  +  RHS * dtau;
 
 
 // TEST:
 // RHS = A_pi * pi(x) +  A_chi * chi(x) + A_phi * phi(x) + A_pi_prime * pi_prime(x)  + A_chi_prime * (chi(x) -chi_old(x))/dtau  + A_phi_prime * (phi(x) - phi_old(x))/dtau + A_Laplace_pi * Laplace_pi + A_Laplace_chi * Laplace_chi  + A_Laplace_phi * Laplace_phi + A_deltaPm * deltaPm(x); // We have to remove phi'' from the equations!
 
+// cout<<"A_pi: "<<A_pi<<" A_chi:"<<A_chi<<" A_phi: "<<A_phi<<" A_pi_prime: "<<A_pi_prime<<" A_chi_prime:"<<A_chi_prime<<" A_phi_prime: "<<A_phi_prime<<" A_Laplace_pi:"<<A_Laplace_pi<<" A_Laplace_chi: "<<A_Laplace_chi<<" A_Laplace_phi: "<<A_Laplace_phi<<" A_deltaPm: "<<A_deltaPm<<endl;
 // pi_prime(x) = pi_prime(x) + 0.1 * pi(x);
 
-    // cout<<"A_pi: "<<A_pi<<" A_chi:"<<A_chi<<" A_phi: "<<A_phi<<" A_pi_prime: "<<A_pi_prime<<" A_chi_prime:"<<A_chi_prime<<" A_phi_prime: "<<A_phi_prime<<" A_Laplace_pi:"<<A_Laplace_pi<<" A_Laplace_chi: "<<A_Laplace_chi<<" A_Laplace_phi: "<<A_Laplace_phi<<" A_deltaPm: "<<A_deltaPm<<endl;
 
        }
 }
 
 
-
-			//////////////////////////
-			// Update K-essence field (pi)
-			//////////////////////////
-			// Description:
-			//   Updating K-essence pi_k field based on equation obtained by energy momentum conservation
-			//
-			// Arguments:
-			//   phi        reference to field configuration
-			//   pi_k       reference to k-essence field
-			//   pi_dot      reference to pi_dot of kessence at (n+1/2)
-			// Returns:
-			//
-			//////////////////////////
-			template <class FieldType>
-			void update_pi_full( double dtau, Field<FieldType> & pi , Field<FieldType> & pi_dot)
-			{
-			  Site x(pi.lattice());
-			  for (x.first(); x.test(); x.next())
-			    {
-            //*****************************************
-            //pi Updating which is linear by definition using pi_dot
-            //*****************************************
-            pi(x) = pi(x)  + dtau * ( pi_dot(x)) ; //  pi_k(n+1)
-            //*************************************************************************************
-			    }
-			}
-			//////////////////////////
-			// Update K-essence velocity field (zeta)
-			//////////////////////////
-			// Description:
-			//   Updating K-essence zeta field based on equation obtained by energy momentum conservation
-			//
-			// Arguments:
-			//   phi        reference to field configuration
-			//   pi_k       reference to k-essence field
-			//   piv_k      reference to first derivative of the field
-      //   n_correcor_steps Number of time which goes through predictor corrector method.
-			// Returns:
-			//
-			//////////////////////////
-
-			template <class FieldType>
-			void update_pi_dot_full(double dtau, double dx, double a, Field<FieldType> & pi , Field<FieldType> & pi_dot, Field<FieldType> & det_gamma, Field<FieldType> & cs2_full, double X_hat ,double g0, double g2, double g4, double Hcon)
-			  {
-        double Laplace_pi, Gradpi_Gradpi, Gradpi_dot_Gradpi, grad_pi_grad_pi_gradgrad_pi;
-        double X, K, dK_dX, d2K_dX2, dK_dpi, d2K_dpidX;
-        double d2pi_dt2, RHS;
-        double term1, term2, term3, term4, term5, term6, term7;
-
-        //**************************************************************
-        //When non-linearities are turned off we put non-linear temrs zero
-        //**************************************************************
-        Laplace_pi=0.;
-        Gradpi_Gradpi=0.;
-        Gradpi_dot_Gradpi=0.;
-
-				Site x(pi.lattice());
-				for (x.first(); x.test(); x.next())
-					{
-            //****************************************************************
-            //Laplace pi, pi(n) since pi is not updated yet
-            //****************************************************************
-  					Laplace_pi= pi(x-0) + pi(x+0) - 2. * pi(x);
-  					Laplace_pi+=pi(x+1) + pi(x-1) - 2. * pi(x);
-  					Laplace_pi+=pi(x+2) + pi(x-2) - 2. * pi(x);
-            Laplace_pi= Laplace_pi/(dx*dx);
-
-            //*************
-            //Gradpi_Gradpi
-            //*************
-            Gradpi_Gradpi= 0.25 * (pi(x + 0)  - pi(x - 0)) * (pi(x + 0) - pi(x - 0)) / (dx * dx);
-            Gradpi_Gradpi+=0.25 * (pi(x + 1)  - pi(x - 1)) * (pi(x + 1) - pi(x - 1)) / (dx * dx);
-            Gradpi_Gradpi+=0.25 * (pi(x + 2)  - pi(x - 2)) * (pi(x + 2) - pi(x - 2)) / (dx * dx);
-            //*************************************************************
-            //Gradpi_dot_Gradpi = Grad_pi . Grad_ (pi_dot )
-            //*************************************************************
-            Gradpi_dot_Gradpi= 0.25* (pi_dot(x+0) - pi_dot(x-0) ) * (pi(x+0) - pi(x-0)) / (dx * dx);
-            Gradpi_dot_Gradpi+=0.25* (pi_dot(x+1) - pi_dot(x-1) ) * (pi(x+1) - pi(x-1)) / (dx * dx);
-            Gradpi_dot_Gradpi+=0.25* (pi_dot(x+2) - pi_dot(x-2) ) * (pi(x+2) - pi(x-2)) / (dx * dx);
-
-            //*************************************************************
-            //dpi_dx * dpj_dx * d^i d^j pi
-            //*************************************************************
-            grad_pi_grad_pi_gradgrad_pi =  //1:  + pi^{(2,0,0}(x,y,z) pi^{(1,0,0)}(x,y,z)^2
-            + ((pi(x - 0) + pi(x + 0) - 2.*pi(x))/(1.0 * dx*dx)) * ((pi(x + 0)  - pi(x - 0))/(2.0*dx*dx)) * ((pi(x + 0)  - pi(x - 0))/(2.0*dx*dx));
-            grad_pi_grad_pi_gradgrad_pi +=  //2:  + pi^{(0,2,0}(x,y,z) pi^{(0,1,0)}(x,y,z)^2
-            + ((pi(x - 1) + pi(x + 1) - 2.*pi(x))/(1.0 * dx*dx)) * ((pi(x + 1)  - pi(x - 1))/(2.0*dx*dx)) * ((pi(x + 1)  - pi(x - 1))/(2.0*dx*dx));
-            grad_pi_grad_pi_gradgrad_pi +=  //3:  + pi^{(0,0,2}(x,y,z) pi^{(0,0,1)}(x,y,z)^2
-            + ((pi(x - 2) + pi(x + 2) - 2.*pi(x))/(1.0 * dx*dx)) * ((pi(x + 2)  - pi(x - 2))/(2.0*dx*dx)) * ((pi(x + 2)  - pi(x - 2))/(2.0*dx*dx));
-            grad_pi_grad_pi_gradgrad_pi +=  //4:  + 2.0 *  pi^{(1,1,0}(x,y,z) pi^{(1,0,0)}(x,y,z) pi^{(0,1,0)}(x,y,z)
-            + 2.0 * ((0.25 *(pi(x + 0 + 1) - pi(x + 0 - 1) - pi(x - 0 + 1) + pi(x - 0 - 1) )/(dx*dx)) * ((pi(x + 0)  - pi(x - 0))/(2.0*dx*dx)) * ((pi(x + 1)  - pi(x - 1))/(2.0*dx*dx)) );
-            grad_pi_grad_pi_gradgrad_pi +=  //5:  + 2.0 *  pi^{(1,0,1}(x,y,z) pi^{(1,0,0)}(x,y,z) pi^{(0,0,1)}(x,y,z)
-            + 2.0 * ((0.25 *(pi(x + 0 + 2) - pi(x + 0 - 2) - pi(x - 0 + 2) + pi(x - 0 - 2) )/(dx*dx)) * ((pi(x + 0)  - pi(x - 0))/(2.0*dx*dx)) * ((pi(x + 2)  - pi(x - 2))/(2.0*dx*dx)));
-            grad_pi_grad_pi_gradgrad_pi +=  //6:  + 2.0 *  pi^{(0,1,1}(x,y,z) pi^{(0,1,0)}(x,y,z) pi^{(0,0,1)}(x,y,z)
-            + 2.0 * ((0.25 *(pi(x + 1 + 2) - pi(x + 1 - 2) - pi(x - 1 + 2) + pi(x - 1 - 2) )/(dx*dx)) * ((pi(x + 1)  - pi(x - 1))/(2.0*dx*dx)) * ((pi(x + 2)  - pi(x - 2))/(2.0*dx*dx)));
-
-            // definitions
-            X = (pi_dot(x) * pi_dot(x) - Gradpi_Gradpi)/(2. * a * a); // Kinetic term
-            K = -g0 + g2 * (X - X_hat) * (X - X_hat) + g4 * pow(X - X_hat,4); // K(X,phi)
-            dK_dX = 2.0 * g2 * (X - X_hat) + 4.0 * g4 * pow(X - X_hat,3);
-            d2K_dX2 = 2.0 * g2 + 12. * g4 * (X - X_hat) * (X - X_hat) ;
-            dK_dpi = 0.;
-            d2K_dpidX =0.;
-
-            term1 = a * a * (dK_dpi  - pi_dot(x) * pi_dot(x) * d2K_dpidX/(a*a));
-            term2 = - Hcon * (2.0 * dK_dX - pi_dot(x) * pi_dot(x) * d2K_dX2/(a*a) ) * pi_dot(x);
-            term3 = dK_dX * Laplace_pi;
-            term4 = d2K_dpidX * Gradpi_Gradpi;//d2K_dpidX * dpi_dx * dpi_dx;
-            term5 = 2.0 * d2K_dX2 * pi_dot(x) * Gradpi_dot_Gradpi/(a*a); //2.0 * d2K_dX2 * dpi_dt *dpi_dx * d2pi_dxdt/a**2;
-            term6 = -Hcon * d2K_dX2 * pi_dot(x) * Gradpi_Gradpi/(a*a);
-            term7 = - d2K_dX2 * grad_pi_grad_pi_gradgrad_pi/(a*a);
-
-          RHS = term1 + term2 + term3 + term4 +term5 +term6 + term7;
-
-          d2pi_dt2 = RHS/(dK_dX + pi_dot(x)* pi_dot(x) * d2K_dX2/(a*a));
-          pi_dot(x) = pi_dot(x) + dtau * d2pi_dt2;
-          det_gamma(x) = (2.0 * dK_dX/a/a) * (2.0 * dK_dX/a/a) * (1. + 2. * X * d2K_dX2/dK_dX);
-          cs2_full(x) = 1. + (2. * X * d2K_dX2 )/dK_dX;
-
-             }
-      }
-
-
-      //////////////////////////
-      // Update K-essence field (pi)
-      //////////////////////////
-      // Description:
-      //   Updating K-essence pi_k field based on equation obtained by energy momentum conservation
-      //
-      // Arguments:
-      //   phi        reference to field configuration
-      //   pi_k       reference to k-essence field
-      //   zeta_half      reference to zeta of kessence at (n+1/2)
-      //   zeta_integer      reference to zeta of kessence at (n+1)
-      // Returns:
-      //
-      //////////////////////////
-      template <class FieldType>
-      void update_pi_k( double dtau, double dx,double a, Field<FieldType> & phi, Field<FieldType> & phi_old, Field<FieldType> & chi,Field<FieldType> & chi_old, Field<FieldType> & pi_k , Field<FieldType> & zeta_half, double Omega_fld ,double w, double cs2, double Hcon, double  H_prime, int non_linearity)
-      {
-
-        double psi, psi_prime, psi_half;
-        double Coeff1 = 1./(1. + Hcon * dtau/2.);
-        Site x(phi.lattice());
-        for (x.first(); x.test(); x.next())
-          {
-            psi=phi(x) - chi(x); //psi(n)
-            psi_prime= ((phi(x) - chi(x)) - (phi_old(x) - chi_old(x))) / dtau; //psi'(n)
-            psi_half= psi + psi_prime * dtau/2.; //psi_half (n+1/2) = psi(n) + psi_prime'(n) dtau/2
-            //*****************************************
-            //pi Updating which is linear by definition
-            //*****************************************
-            pi_k(x) = Coeff1 * ( pi_k(x)  + dtau * ( zeta_half(x) - Hcon * pi_k(x)/2. + psi_half ) ); //  pi_k(n+1)
-            //*************************************************************************************
-          }
-      }
-      //////////////////////////
-      // Update K-essence velocity field (zeta)
-      //////////////////////////
-      // Description:
-      //   Updating K-essence zeta field based on equation obtained by energy momentum conservation
-      //
-      // Arguments:
-      //   phi        reference to field configuration
-      //   pi_k       reference to k-essence field
-      //   piv_k      reference to first derivative of the field
-      //   zeta_integer    reference to zeta at int steps which is useful for pi_k updating
-      //   zeta_half    reference to zeta at half steps which is useful for pi_k updating
-      //   n_correcor_steps Number of time which goes through predictor corrector method.
-      // Returns:
-      //
-      //////////////////////////
-      // We use predictor corrector method to calculate \zeta precisely for non-linear case. (for linear equation is does not make better)
-      // updating zeta from n-1/2 to n+1/2 by zeta'(n)
-      template <class FieldType>
-      void update_zeta(double dtau, double dx,double a, Field<FieldType> & phi, Field<FieldType> & phi_old, Field<FieldType> & chi, Field<FieldType> & chi_old, Field<FieldType> & pi_k , Field<FieldType> & zeta_half, double Omega_fld ,double c_a2, double cs2, double s, double Hcon, double H_prime, int non_linearity )
-        {
-        double Gradphi_Gradpi, Gradpsi_Gradpi, Gradpi_Gradpi, GradZeta_Gradpi, Gradi_nablai_pi_Grad_pi_squared, Dx_psi, Dy_psi, Dz_psi;
-        double C1, C2, C3, psi, psi_old, psi_prime, phi_prime, Laplacian_pi, zeta_old_integer, zeta_old_half ;
-        // double Emilio_term;
-        //Since a_kess is at n so H_prime is at n which is needed to calculate zeta(n+1/2)
-        //**************************************************************
-        //Coefficient two, H(n), H_prime(n) since BG already updated
-        //**************************************************************
-        C2 = cs2 * (3. * Hcon * Hcon - 3. * H_prime );
-        //**************************************************************
-        //Coefficient three, H(n), H_prime(n)
-        //**************************************************************
-        C3 = (2. + 3. * c_a2 + cs2 + s) *  Hcon/2.;
-
-        //**************************************************************
-        //When non-linearities are turned off we put non-linear temrs zero
-        //**************************************************************
-        Gradphi_Gradpi=0.;
-        Gradpsi_Gradpi=0.;
-        Gradpi_Gradpi=0.;
-        GradZeta_Gradpi=0.;
-        Gradi_nablai_pi_Grad_pi_squared=0;
-        Site x(phi.lattice());
-        for (x.first(); x.test(); x.next())
-          {
-          //****************************************************************
-          //Laplace pi, pi(n) since pi is not updated yet
-          //****************************************************************
-          Laplacian_pi= pi_k(x-0) + pi_k(x+0) - 2. * pi_k(x);
-          Laplacian_pi+=pi_k(x+1) + pi_k(x-1) - 2. * pi_k(x);
-          Laplacian_pi+=pi_k(x+2) + pi_k(x-2) - 2. * pi_k(x);
-          Laplacian_pi= Laplacian_pi/(dx*dx);
-          //********************************************
-          //psi(n)
-          //*********************************************
-          psi = phi(x) - chi(x);
-
-          //Coefficient one, H( at n)
-          //***************************
-          C1 = 1./(1. -  (3. * c_a2 + s) * Hcon   * dtau/2. -  non_linearity * (1. - cs2) *  Laplacian_pi * dtau/2.);
-          // C1 = 1./(1. -  (3. * w) * Hcon   * dtau/2. -  non_linearity * (1. - cs2) *  Laplacian_pi * dtau/2.);
-
-          //**********************************************
-          //phi'(n)
-          //**********************************************
-          phi_prime= (phi(x) - phi_old(x))/dtau; //phi_prime(n) since we want to use it to compute zeta (n+1/2)
-          //********************************
-          //psi'(n)
-          //psi(n)
-          //********************************
-          psi_prime= ((phi(x) - chi(x)) - (phi_old(x) - chi_old(x)))/dtau;
-          if (non_linearity ==1)
-            {
-            //**********
-            //Grad_i Psi
-            //**********
-            Dx_psi = ((phi(x + 0) - chi(x + 0)) - (phi(x - 0) - chi(x - 0)));
-            Dy_psi = ((phi(x + 1) - chi(x + 1)) - (phi(x - 1) - chi(x - 1)));
-            Dz_psi = ((phi(x + 2) - chi(x + 2)) - (phi(x - 2) - chi(x - 2)));
-            //*******************
-            //Grad_phi . Grad_pi
-            //******************
-            Gradphi_Gradpi= 0.25 * (phi(x + 0)  - phi(x - 0)) * (pi_k(x + 0) - pi_k(x - 0)) / (dx * dx);
-            Gradphi_Gradpi+=0.25 * (phi(x + 1)  - phi(x - 1)) * (pi_k(x + 1) - pi_k(x - 1)) / (dx * dx);
-            Gradphi_Gradpi+=0.25 * (phi(x + 2)  - phi(x - 2)) * (pi_k(x + 2) - pi_k(x - 2)) / (dx * dx);
-            //*******************
-            //Grad_psi . Grad_pi
-            //******************
-            Gradpsi_Gradpi= 0.25 * (Dx_psi) * (pi_k(x+0) - pi_k(x-0)) / (dx * dx);
-            Gradpsi_Gradpi+=0.25 * (Dy_psi) * (pi_k(x+1) - pi_k(x-1)) / (dx * dx);
-            Gradpsi_Gradpi+=0.25 * (Dz_psi) * (pi_k(x+2) - pi_k(x-2)) / (dx * dx);
-            //*************
-            //Gradpi_Gradpi
-            //*************
-            Gradpi_Gradpi= 0.25 * (pi_k(x + 0)  - pi_k(x - 0)) * (pi_k(x + 0) - pi_k(x - 0)) / (dx * dx);
-            Gradpi_Gradpi+=0.25 * (pi_k(x + 1)  - pi_k(x - 1)) * (pi_k(x + 1) - pi_k(x - 1)) / (dx * dx);
-            Gradpi_Gradpi+=0.25 * (pi_k(x + 2)  - pi_k(x - 2)) * (pi_k(x + 2) - pi_k(x - 2)) / (dx * dx);
-            //*************************************************************
-            //GradZeta_Gradpi = Grad_pi . Grad_ (zeta )
-            //zeta_integer from previous step is at n
-            //*************************************************************
-            GradZeta_Gradpi= 0.25* (zeta_half(x+0) - zeta_half(x-0) ) * (pi_k(x+0) - pi_k(x-0)) / (dx * dx);
-            GradZeta_Gradpi+=0.25* (zeta_half(x+1) - zeta_half(x-1) ) * (pi_k(x+1) - pi_k(x-1)) / (dx * dx);
-            GradZeta_Gradpi+=0.25* (zeta_half(x+2) - zeta_half(x-2) ) * (pi_k(x+2) - pi_k(x-2)) / (dx * dx);
-
-            //**********************************************************
-            //New term whcih comes from 3 fields and 4 spatial derivative
-            //1:  + 3 pi^{(0,0,2}(x,y,z) pi^{(0,0,1)}(x,y,z)^2
-            //2:  + pi^{(0,0,2)}(x,y,z) {pi}^{(0,1,0)}(x,y,z)^2
-            //3:  + 4 pi^{(0,0,1)}(x,y,z) pi^{(0,1,0)}(x,y,z) pi^{(0,1,1)}(x,y,z)
-            //4:  + pi^{(0,2,0)}(x,y,z) pi^{(0,0,1)}(x,y,z)^2
-            //5:  + 3 pi^{(0,1,0)}(x,y,z)^2 pi^{(0,2,0)}(x,y,z)
-            //6:  + pi^{(0,0,2)}(x,y,z) pi^{(1,0,0)}(x,y,z)^2
-            //7:  + pi^{(0,2,0)}(x,y,z) pi^{(1,0,0)}(x,y,z)^2
-            //8:  + 4 pi^{(0,0,1)}(x,y,z) pi^{(1,0,0)}(x,y,z) pi^{(1,0,1)}(x,y,z)
-            //9:  +  4 pi^{(0,1,0)}(x,y,z) pi^{(1,0,0)}(x,y,z) pi^{(1,1,0)}(x,y,z)
-            //10: + pi^{(2,0,0,0)}(x,y,z) pi^{(0,0,1,0)}(x,y,z)^2
-            //11: + pi^{(0,1,0)}(x,y,z)^2 pi^{(2,0,0)}(x,y,z)
-            //12: + 3 pi^{(1,0,0)}(x,y,z)^2 pi^{(2,0,0)}(x,y,z)
-
-            //*********************************************************
-            Gradi_nablai_pi_Grad_pi_squared =
-            //1:  + 3 pi^{(0,0,2}(x,y,z) pi^{(0,0,1)}(x,y,z)^2
-            + 3. * (pi_k(x - 2) + pi_k(x + 2) - 2. * pi_k(x))/(dx*dx)
-            * 0.25 * (pi_k(x + 2)  - pi_k(x - 2)) * (pi_k(x + 2) - pi_k(x - 2)) / (dx * dx)
-            //2:  + pi^{(0,0,2)}(x,y,z) {pi}^{(0,1,0)}(x,y,z)^2
-            + (pi_k(x - 2) + pi_k(x + 2) - 2. * pi_k(x))/(dx*dx)
-            * 0.25 * (pi_k(x + 1)  - pi_k(x - 1)) * (pi_k(x + 1) - pi_k(x - 1)) / (dx * dx)
-            //3:  + 4 pi^{(0,0,1)}(x,y,z) pi^{(0,1,0)}(x,y,z) pi^{(0,1,1)}(x,y,z)
-            //Definition of f^{(1,1)}(x,y) = (f_{x+1,y+1} - f_{x+1,y-1} - f_{x-1,y+1} + f_{x-1,y-1})/(4*dx^2)
-            //In LATfield f_{x+1,y+1} = f(x + 0 + 1)
-            + 4. *  0.25 * (pi_k(x + 2)  - pi_k(x - 2)) * (pi_k(x + 1) - pi_k(x - 1)) / (dx * dx) *
-            0.25 *(pi_k(x + 1 + 2) - pi_k(x + 1 - 2) - pi_k(x - 1 + 2) + pi_k(x - 1 - 2) )/(dx*dx)
-            //4:  + pi^{(0,2,0)}(x,y,z) pi^{(0,0,1)}(x,y,z)^2
-            + (pi_k(x - 1) + pi_k(x + 1) - 2. * pi_k(x))/(dx*dx)
-            * 0.25 * (pi_k(x + 2)  - pi_k(x - 2)) * (pi_k(x + 2) - pi_k(x - 2)) / (dx * dx)
-            //5:  + 3 pi^{(0,1,0)}(x,y,z)^2 pi^{(0,2,0)}(x,y,z)
-            + 3. * (pi_k(x - 1) + pi_k(x + 1) - 2. * pi_k(x))/(dx*dx)
-            * 0.25 * (pi_k(x + 1)  - pi_k(x - 1)) * (pi_k(x + 1) - pi_k(x - 1)) / (dx * dx)
-            //6:  + pi^{(0,0,2)}(x,y,z) pi^{(1,0,0)}(x,y,z)^2
-            + (pi_k(x - 2) + pi_k(x + 2) - 2. * pi_k(x))/(dx*dx)
-            * 0.25 * (pi_k(x + 0)  - pi_k(x - 0)) * (pi_k(x + 0) - pi_k(x - 0)) / (dx * dx)
-            //7:  + pi^{(0,2,0)}(x,y,z) pi^{(1,0,0)}(x,y,z)^2
-            + (pi_k(x - 1) + pi_k(x + 1) - 2. * pi_k(x))/(dx*dx)
-            * 0.25 * (pi_k(x + 0)  - pi_k(x - 0)) * (pi_k(x + 0) - pi_k(x - 0)) / (dx * dx)
-            //8:  + 4 pi^{(0,0,1)}(x,y,z) pi^{(1,0,0)}(x,y,z) pi^{(1,0,1)}(x,y,z)
-            //Definition of f^{(1,1)}(x,z) = (f_{x+1,z+1} - f_{x+1,z-1} - f_{x-1,z+1} + f_{x-1,z-1})/(4*dx^2)
-            //In LATfield f_{x+1,z+1} = f(x + 0 + 2)
-            + 4. *  0.25 * (pi_k(x + 2)  - pi_k(x - 2)) * (pi_k(x + 0) - pi_k(x - 0)) / (dx * dx) *
-            0.25 *(pi_k(x + 0 + 2) - pi_k(x + 0 - 2) - pi_k(x - 0 + 2) + pi_k(x - 0 - 2) )/(dx*dx)
-            //9:  +  4 pi^{(0,1,0)}(x,y,z) pi^{(1,0,0)}(x,y,z) pi^{(1,1,0)}(x,y,z)
-            + 4. *  0.25 * (pi_k(x + 1)  - pi_k(x - 1)) * (pi_k(x + 0) - pi_k(x - 0)) / (dx * dx) *
-            0.25 * (pi_k(x + 0 + 1) - pi_k(x + 0 - 1) - pi_k(x - 0 + 1) + pi_k(x - 0 - 1) )/(dx*dx)
-            //10: + pi^{(2,0,0)}(x,y,z) pi^{(0,0,1)}(x,y,z)^2
-            + (pi_k(x - 0) + pi_k(x + 0) - 2. * pi_k(x))/(dx*dx)
-            * 0.25 * (pi_k(x + 2)  - pi_k(x - 2)) * (pi_k(x + 2) - pi_k(x - 2)) / (dx * dx)
-            //11: + pi^{(0,1,0)}(x,y,z)^2 pi^{(2,0,0)}(x,y,z)
-            + (pi_k(x - 0) + pi_k(x + 1) - 2. * pi_k(x))/(dx*dx)
-            * 0.25 * (pi_k(x + 1)  - pi_k(x - 1)) * (pi_k(x + 1) - pi_k(x - 1)) / (dx * dx)
-            //12: + 3 pi^{(1,0,0)}(x,y,z)^2 pi^{(2,0,0)}(x,y,z)
-            + 3. * (pi_k(x - 0) + pi_k(x + 0) - 2. * pi_k(x))/(dx*dx)
-            * 0.25 * (pi_k(x + 0)  - pi_k(x - 0)) * (pi_k(x + 0) - pi_k(x - 0)) / (dx * dx);
-          }
-          //***********************************
-          // Having the values at previous steps
-          //***********************************
-          // zeta_old_integer = zeta_integer(x); //zeta(n)
-          //***********************
-          // FULL Updating equation
-          //***********************
-          //***************************************
-          // zeta(n+1/2) = zeta(n-1/2) + zeta'(n)
-          //***************************************
-          zeta_half(x) =         C1 * ( zeta_half(x) + dtau * (
-          /*Linear(1,2,3)*/      + (3. * c_a2 + s) * Hcon * zeta_half(x)/2. + 3. * Hcon * cs2 * psi  - C2 * pi_k(x)
-         // /*Linear(1,2,3)*/      + 3. * Hcon * ( w * zeta_half(x)/2. + cs2 * psi ) - C2 * pi_k(x)
-         /*Linear(4,5)*/        + 3. * cs2 * phi_prime + cs2 * Laplacian_pi
-         /*Non-linear terms*/   + non_linearity * (
-         /*Non-linear(1,2)*/    - cs2 * (phi(x) - psi) * Laplacian_pi
-         /*Non-linear(3)  */    - 3. * cs2 * Hcon * (1. + c_a2) * pi_k(x) * Laplacian_pi
-         /*Non-linear(3)  */    + (1. - cs2) * (zeta_half(x) ) * Laplacian_pi
-          /*Non-linear(5,6,7)*/  - cs2 * Gradphi_Gradpi + Gradpsi_Gradpi - C3 * Gradpi_Gradpi
-         /*Non-linear(8)  */    + 2. * (1. - cs2) * GradZeta_Gradpi
-    /*Non-linear Higher order 9:*/   - (1. -cs2)/2. * Gradi_nablai_pi_Grad_pi_squared
-                                       )
-                                         )
-                                  );
-        //**********************************************************************
-        //**********************************************************************
-        //PREDICTOR-CORRECTOR METHOD
-        //**********************************************************************
-        //**********************************************************************
-
-        //****************************************
-        //Predictor-corrector on zeta_half (n+3/2)
-        //****************************************
-        // double zeta_predictor_half_n0, zeta_prime_int_n0, zeta_corrector_half_n1 ;
-        // // zeta_predictor_int_n0 = zeta(n), zeta_prime_int_n0= zeta'(n) and
-        // // zeta_predictor_half_n1 = zeta(n+1/2)
-        // int n_correcor_steps=10, numerator;
-        // numerator=0;
-        // //***********************
-        // //Maximum relative error
-        // //***********************
-        // double Max_error=1.e-5;
-        // //*****************************************************************************
-        // //Making the corrector for the first loop from the newly calculated zeta(n+1/2)
-        // //zeta_half(n+1/2) = (zeta(n+1) + zeta(n))/2
-        // //*****************************************************************************
-        // zeta_half(x) = (zeta_integer(x) + zeta_old_integer)/2.;
-        // //********************************************
-        // //n_correcor_steps loops over corrector method
-        // //********************************************
-        // for (int i=1; i<n_correcor_steps+1; i++)
-        //   {
-        //   //***********************************************************
-        //   //Goes to predictor corrector only if we have Non-linearities
-        //   //***********************************************************
-        //   if (non_linearity ==1)
-        //     {
-        //       //*************************************************************
-        //       //Corrected: GradPsiZeta_Gradpi = Grad_pi . Grad_ (zeta + psi)
-        //       //Grad_pi . Grad_ (zeta + psi) = Grad_pi (Grad_zeta + Grad_Psi)
-        //       //Where zeta_integer is the corrected one at step (n)
-        //       //Before we have zeta because of approximation
-        //       //*************************************************************
-        //       GradPsiZeta_Gradpi= 0.25* (zeta_integer(x+0) - zeta_integer(x-0) + Dx_psi) * (pi_k(x+0) - pi_k(x-0)) / (dx * dx);
-        //       GradPsiZeta_Gradpi+=0.25* (zeta_integer(x+1) - zeta_integer(x-1) + Dy_psi) * (pi_k(x+1) - pi_k(x-1)) / (dx * dx);
-        //       GradPsiZeta_Gradpi+=0.25* (zeta_integer(x+2) - zeta_integer(x-2) + Dz_psi) * (pi_k(x+2) - pi_k(x-2)) / (dx * dx);
-        //
-        //     }
-        //   //**********************************************
-        //   // zeta'(n) from the new values at n, zeta(n)...
-        //   // like zeta_integer(x) (n)
-        //   //**********************************************
-        //   zeta_prime_int_n0 =
-        //   /*Linear(1,2,3)*/      + 3. * Hcon * ( w * zeta_integer(x) + cs2 * psi ) - C2 * pi_k(x)
-        //   /*Linear(4,5)*/        + 3. * cs2 * phi_prime + cs2 * Laplacian_pi
-        //   /*Non-linear(1,2)*/    + 2. * cs2 * phi(x) * Laplacian_pi - (1. - cs2) * psi * Laplacian_pi
-        //   /*Non-linear(3)  */    - 3. * cs2 * Hcon * (1. + w) * pi_k(x) * Laplacian_pi
-        //   /*Non-linear(4)  */    +(1. - cs2) * (zeta_integer(x) + psi) * Laplacian_pi
-        //   /*Non-linear(5,6,7)*/  - cs2 * Gradphi_Gradpi + (2. * cs2 -1.) * Gradpsi_Gradpi - C3 * Gradpi_Gradpi
-        //   /*Non-linear(8)  */    + 2.* (1. - cs2) * GradPsiZeta_Gradpi;              //************************************************************************************
-        //   //Computing the zeta_corrected(n+1/2) from the new value of zeta'(n) and zeta(n-1/2)
-        //   //************************************************************************************
-        //   zeta_corrector_half_n1 = zeta_integer(x) + zeta_prime_int_n0 * dtau/2;
-        //
-        //   //***********************************************************************************
-        //   //Computing the corredcted zeta(n) from the new value of zeta(n+1/2) and zeta(n-1/2)
-        //   //************************************************************************************
-        //   zeta_predictor_int_n0  = (zeta_corrector_half_n1 + zeta_old_half)/2.;
-        //
-        //   //***********************************************************************************
-        //   // Now we must check the relative error between the two corrected and predicted ones zeta_integer(x)=zeta_predictor_int_n0 and the previous step: zeta_half(x), zeta_integer(x)
-        //   //If the error has reached less than 10^-6% it breacks the loop
-        //   //***********************************************************************************
-        //   if (abs(2. * (zeta_corrector_half_n1 - zeta_half(x)))/(zeta_half(x) + zeta_corrector_half_n1) <Max_error) break;
-        //    zeta_half(x)    = zeta_corrector_half_n1; // zeta(n+3/2) after correction
-        //    zeta_integer(x) = zeta_predictor_int_n0; //zeta(n+1) after correction
-        //    numerator++;
-        //   }
-        //   if (numerator==n_correcor_steps) cout << "\033[1;31mbold WARNING: PRECISION ERROR ON KESSENCE FIELD ZETA, More than 1% Error\033[0m\n" << '\n';
-        //
-        // //***********************************************************************************
-        // // When we get the precision and it goes out of loop we need to update zeta_integer for
-        // //being synched with particles and ....
-        // //zeta(n+1) = zeta(n+1/2) + zeta'(n)dtau/2
-        // //***********************************************************************************
-        // zeta_integer(x) = zeta_half(x) +   zeta_prime_int_n0 * dtau/2.;
-
-             }
-      }
 
 //////////////////////////
 // prepareFTsource (2)

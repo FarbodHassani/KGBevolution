@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 	double ref_time, ref2_time, cycle_start_time;
 	double initialization_time;
 	double run_time;
-  double kessence_update_time=0; // How much time is put on updating the kessence field
+  double mg_update_time=0; // How much time is put on updating the mg field
 	double cycle_time=0;
 	double projection_time = 0;
 	double snapshot_output_time = 0;
@@ -91,8 +91,8 @@ int main(int argc, char **argv)
 	int update_q_count = 0;
 	double moveParts_time = 0;
 	int  moveParts_count =0;
-	//kessence
-	double a_kess;
+	//mg
+	double a_mg;
   double Hc;
 
 
@@ -123,13 +123,14 @@ int main(int argc, char **argv)
 	//Background variables EFTevolution //TODO_EB: add as many as necessary
 	gsl_spline * H_spline = NULL;
   gsl_spline * cs2_spline = NULL;
-	gsl_spline * alpha_K = NULL;
-  gsl_spline * alpha_B = NULL;
-  gsl_spline * alpha_K_prime = NULL;
-  gsl_spline * alpha_B_prime = NULL;
+	gsl_spline * alpha_K_spline = NULL;
+  gsl_spline * alpha_B_spline = NULL;
+  gsl_spline * alpha_K_prime_spline = NULL;
+  gsl_spline * alpha_B_prime_spline = NULL;
 	gsl_spline * rho_smg_spline = NULL;
 	gsl_spline * p_smg_spline = NULL;
   gsl_spline * p_smg_prime_spline = NULL;
+  gsl_spline * H_prime_spline = NULL;
   gsl_spline * H_prime_prime_spline = NULL;
 	gsl_spline * rho_crit_spline = NULL;
 	#endif
@@ -187,12 +188,14 @@ int main(int argc, char **argv)
 	else
 	{
 #endif
-
-	COUT << COLORTEXT_WHITE << endl;
-	COUT << "| /  "<<endl;
-	COUT << "|/    _      _   _  _ , _" << endl;
-	COUT << "|\\  (-' \\/ (_) (_ (_| (  ( (_) /\\/	version 1.0    running on " << n*m << " cores." << endl;
-  COUT << "| \\" << endl << COLORTEXT_RESET << endl;
+COUT<<"\033[1;36m \n";
+COUT << "             ___    ___   _______                 \n";
+COUT << "            |      |         |                    \n";
+COUT << "            |___   |___      |   - evolution      \n";
+COUT << "            |      |         |                    \n";
+COUT << "            |___   |         |                    \n";
+COUT << "   running on " << n*m << " cores." << endl;
+COUT << " \033[0m" << endl;
 
 	if (settingsfile == NULL)
 	{
@@ -233,11 +236,12 @@ int main(int argc, char **argv)
   loadBGFunctions(class_background, rho_smg_spline, "(.)rho_smg", sim.z_in);
   loadBGFunctions(class_background, p_smg_spline, "(.)p_smg", sim.z_in);
   loadBGFunctions(class_background, p_smg_prime_spline, "(.)p_smg_prime", sim.z_in);
+  loadBGFunctions(class_background, H_prime_spline, "H_prime", sim.z_in);
   loadBGFunctions(class_background, H_prime_prime_spline, "H_prime_prime", sim.z_in);
-  loadBGFunctions(class_background, alpha_K, "kineticity_smg", sim.z_in);
-  loadBGFunctions(class_background, alpha_B, "braiding_smg", sim.z_in);
-  loadBGFunctions(class_background, alpha_K_prime, "kineticity_prime_smg", sim.z_in);
-  loadBGFunctions(class_background, alpha_B_prime, "braiding_prime_smg", sim.z_in);
+  loadBGFunctions(class_background, alpha_K_spline, "kineticity_smg", sim.z_in);
+  loadBGFunctions(class_background, alpha_B_spline, "braiding_smg", sim.z_in);
+  loadBGFunctions(class_background, alpha_K_prime_spline, "kineticity_prime_smg", sim.z_in);
+  loadBGFunctions(class_background, alpha_B_prime_spline, "braiding_prime_smg", sim.z_in);
   loadBGFunctions(class_background, rho_crit_spline, "(.)rho_crit", sim.z_in);
 #endif
 
@@ -273,25 +277,25 @@ int main(int argc, char **argv)
 	source.initialize(lat,1);
 	phi.initialize(lat,1);
 
-	//kessence
+	//mg
 	Field<Real> phi_old;
   //phi at two step before to compute phi'(n+1/2)
 
-	Field<Real> pi_k;
+	Field<Real> pi_mg;
   Field<Real> deltaPm; // matter pressure perturbation
-  Field<Real> zeta_half;
-	Field<Real> T00_Kess;
-	Field<Real> T0i_Kess;
-	Field<Real> Tij_Kess;
+  Field<Real> pi_mg_prime;
+	Field<Real> T00_mg;
+	Field<Real> T0i_mg;
+	Field<Real> Tij_mg;
 	Field<Cplx> scalarFT_phi_old;
 	Field<Cplx> scalarFT_chi_old;
 	Field<Cplx> scalarFT_pi;
   Field<Cplx> scalarFT_deltaPm;
 	// Field<Cplx> scalarFT_zeta_integer;
-  Field<Cplx> scalarFT_zeta_half;
-	Field<Cplx> T00_KessFT;
-	Field<Cplx> T0i_KessFT;
-	Field<Cplx> Tij_KessFT;
+  Field<Cplx> scalarFT_pi_mg_prime;
+	Field<Cplx> T00_mgFT;
+	Field<Cplx> T0i_mgFT;
+	Field<Cplx> Tij_mgFT;
 	chi.initialize(lat,1);
 	scalarFT.initialize(latFT,1);
 	PlanFFT<Cplx> plan_source(&source, &scalarFT);
@@ -310,7 +314,7 @@ int main(int argc, char **argv)
 	BiFT_check.initialize(latFT,3);
 	PlanFFT<Cplx> plan_Bi_check(&Bi_check, &BiFT_check);
 #endif
-	//Kessence end
+	//mg end
   #ifdef VELOCITY
   	Field<Real> vi;
   	Field<Cplx> viFT;
@@ -323,39 +327,39 @@ int main(int argc, char **argv)
 	scalarFT_phi_old.initialize(latFT,1);
 	PlanFFT<Cplx> plan_phi_old(&phi_old, &scalarFT_phi_old);
   //Relativistic corrections
-	pi_k.initialize(lat,1);
+	pi_mg.initialize(lat,1);
 	scalarFT_pi.initialize(latFT,1);
-	PlanFFT<Cplx> plan_pi_k(&pi_k, &scalarFT_pi);
+	PlanFFT<Cplx> plan_pi_mg(&pi_mg, &scalarFT_pi);
 
   deltaPm.initialize(lat,1);
   scalarFT_deltaPm.initialize(latFT,1);
   PlanFFT<Cplx> plan_deltaPm(&deltaPm, &scalarFT_deltaPm);
-	//zeta_integer_k kessence
-	// zeta_half.initialize(lat,1);
-	// scalarFT_zeta_half.initialize(latFT,1);
-	// PlanFFT<Cplx> plan_zeta_half(&zeta_half, &scalarFT_zeta_half);
-  //zeta_half_k kessence
-  zeta_half.initialize(lat,1);
-  scalarFT_zeta_half.initialize(latFT,1);
-  PlanFFT<Cplx> plan_zeta_half(&zeta_half, &scalarFT_zeta_half);
+	//zeta_integer_k mg
+	// pi_mg_prime.initialize(lat,1);
+	// scalarFT_pi_mg_prime.initialize(latFT,1);
+	// PlanFFT<Cplx> plan_pi_mg_prime(&pi_mg_prime, &scalarFT_pi_mg_prime);
+  //pi_mg_prime_k mg
+  pi_mg_prime.initialize(lat,1);
+  scalarFT_pi_mg_prime.initialize(latFT,1);
+  PlanFFT<Cplx> plan_pi_mg_prime(&pi_mg_prime, &scalarFT_pi_mg_prime);
 	//chi_old initialize
 	chi_old.initialize(lat,1);
 	scalarFT_chi_old.initialize(latFT,1);
 	PlanFFT<Cplx> plan_chi_old(&chi_old, &scalarFT_chi_old);
 	//Stress tensor initializing
-	T00_Kess.initialize(lat,1);
-	T00_KessFT.initialize(latFT,1);
-	PlanFFT<Cplx> plan_T00_Kess(&T00_Kess, &T00_KessFT);
-	// T00_Kess.alloc();  // It seems we don't need it!
-	T0i_Kess.initialize(lat,3);
-	T0i_KessFT.initialize(latFT,3);
-	PlanFFT<Cplx> plan_T0i_Kess(&T0i_Kess, &T0i_KessFT);
-	// T0i_Kess.alloc();
-	Tij_Kess.initialize(lat,3,3,symmetric);
-	Tij_KessFT.initialize(latFT,3,3,symmetric);
-	PlanFFT<Cplx> plan_Tij_Kess(&Tij_Kess, &Tij_KessFT);
-	// Tij_Kess.alloc();
-	// kessence end
+	T00_mg.initialize(lat,1);
+	T00_mgFT.initialize(latFT,1);
+	PlanFFT<Cplx> plan_T00_mg(&T00_mg, &T00_mgFT);
+	// T00_mg.alloc();  // It seems we don't need it!
+	T0i_mg.initialize(lat,3);
+	T0i_mgFT.initialize(latFT,3);
+	PlanFFT<Cplx> plan_T0i_mg(&T0i_mg, &T0i_mgFT);
+	// T0i_mg.alloc();
+	Tij_mg.initialize(lat,3,3,symmetric);
+	Tij_mgFT.initialize(latFT,3,3,symmetric);
+	PlanFFT<Cplx> plan_Tij_mg(&Tij_mg, &Tij_mgFT);
+	// Tij_mg.alloc();
+	// mg end
 
 
 	update_cdm_fields[0] = &phi;
@@ -401,11 +405,11 @@ int main(int argc, char **argv)
 			cosmo
 		#endif
 	) )
-		// dtau = sim.Cf * dx / sim.nKe_numsteps;
+		// dtau = sim.Cf * dx / cosmo.n_mg_numsteps;
     dtau = sim.Cf * dx;
 
 	else
-		// dtau = sim.steplimit / sim.nKe_numsteps / Hconf(a, fourpiG,//TODO_EB
+		// dtau = sim.steplimit / cosmo.n_mg_numsteps / Hconf(a, fourpiG,//TODO_EB
 		// 	#ifdef HAVE_CLASS_BG
 		// 		H_spline, acc
 		// 	#else
@@ -423,7 +427,7 @@ int main(int argc, char **argv)
 
 	dtau_old = 0.;
 	if (ic.generator == ICGEN_BASIC)
-		generateIC_basic(sim, ic, cosmo, fourpiG, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &pi_k, &zeta_half, &chi, &Bi, &source, &Sij, &scalarFT, &scalarFT_pi, &scalarFT_zeta_half, &BiFT, &SijFT, &plan_phi, &plan_pi_k, &plan_zeta_half, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, params, numparam);
+		generateIC_basic(sim, ic, cosmo, fourpiG, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &pi_mg, &pi_mg_prime, &chi, &Bi, &source, &Sij, &scalarFT, &scalarFT_pi, &scalarFT_pi_mg_prime, &BiFT, &SijFT, &plan_phi, &plan_pi_mg, &plan_pi_mg_prime, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, params, numparam);
 	// generates ICs on the fly
 	else if (ic.generator == ICGEN_READ_FROM_DISK)
     readIC(sim, ic, cosmo, fourpiG, a, tau, dtau, dtau_old, &pcls_cdm, &pcls_b, pcls_ncdm, maxvel, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij, cycle, snapcount, pkcount, restartcount, IDbacklog, params, numparam);
@@ -596,10 +600,10 @@ int main(int argc, char **argv)
 #endif
 
 #ifdef BENCHMARK
-		kessence_update_time += MPI_Wtime() - ref_time;
+		mg_update_time += MPI_Wtime() - ref_time;
 		ref_time = MPI_Wtime();
 #endif
-// Kessence projection Tmunu end
+// mg projection Tmunu end
 
 		if (sim.gr_flag > 0)
 		{
@@ -694,8 +698,8 @@ int main(int argc, char **argv)
 			else
 			{
         if (cycle == 0)
-          fprintf(outfile, "# background statistics\n# cycle   tau/boxsize    a             conformal H/H0  phi(k=0)       T00(k=0)\n");
-        fprintf(outfile, " %6d   %e   %e   %e   %e   %e\n", cycle, tau, a, Hconf(a, fourpiG,//TODO_EB
+          fprintf(outfile, "# background statistics\n# 0:cycle      1:tau/boxsize      2:a      3:conf H/H0      4:conf H'/H0^2      5:conf H''/H0^3      6:alpha_K      7:alpha_B      8:alpha_K_prime/H0      9:alpha_B_prime/H0     10:rho_smg      11:p_smg      12:p_smg_prime      13:phi(k=0)      14:T00(k=0)\n");
+        fprintf(outfile, " %6d   %e   %e   %e   %e    %e   %e   %e   %e   %e   %e   %e   %e   %e   %e\n", cycle, tau, a, Hconf(a, fourpiG,//TODO_EB
         #ifdef HAVE_CLASS_BG
           H_spline, acc
         #else
@@ -708,9 +712,20 @@ int main(int argc, char **argv)
         #else
           cosmo
         #endif
-        ), scalarFT(kFT).real(), T00hom);
+      )
+      , gsl_spline_eval(H_prime_spline, a, acc)/gsl_spline_eval(H_spline, 1, acc)/gsl_spline_eval(H_spline, 1, acc)
+      , gsl_spline_eval(H_prime_prime_spline, a, acc)/gsl_spline_eval(H_spline, 1, acc)/gsl_spline_eval(H_spline, 1, acc)/gsl_spline_eval(H_spline, 1, acc)
+      , gsl_spline_eval(alpha_K_spline, a, acc)
+      , gsl_spline_eval(alpha_B_spline, a, acc)
+      , gsl_spline_eval(alpha_K_prime_spline, a, acc)/gsl_spline_eval(H_spline, 1, acc)
+      , gsl_spline_eval(alpha_B_prime_spline, a, acc)/gsl_spline_eval(H_spline, 1, acc)
+      , gsl_spline_eval(rho_smg_spline, a, acc)
+      , gsl_spline_eval(p_smg_spline, a, acc)
+      , gsl_spline_eval(p_smg_prime_spline, a, acc)
+      , scalarFT(kFT).real(), T00hom);
         fclose(outfile);
 			}
+
 		}
 		// done recording background data
 
@@ -805,7 +820,7 @@ ref_time = MPI_Wtime();
         #ifdef HAVE_CLASS_BG
         H_spline, acc,
         #endif
-        &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &pi_k,&zeta_half, &chi, &Bi, &T00_Kess, &T0i_Kess, &Tij_Kess, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
+        &pcls_cdm, &pcls_b, pcls_ncdm, &phi, &pi_mg,&pi_mg_prime, &chi, &Bi, &T00_mg, &T0i_mg, &Tij_mg, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
 #ifdef CHECK_B
 				, &Bi_check, &BiFT_check, &plan_Bi_check
 #endif
@@ -831,7 +846,7 @@ ref_time = MPI_Wtime();
 #ifdef HAVE_CLASS
 				class_background, class_perturbs, ic,
 #endif
-				&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &pi_k, &zeta_half, &chi, &Bi, &T00_Kess, &T0i_Kess, &Tij_Kess ,&source, &Sij, &scalarFT, &scalarFT_pi, &scalarFT_zeta_half, &BiFT, &T00_KessFT, &T0i_KessFT, &Tij_KessFT, &SijFT, &plan_phi, &plan_pi_k , &plan_zeta_half, &plan_chi, &plan_Bi, &plan_T00_Kess, &plan_T0i_Kess, &plan_Tij_Kess, &plan_source, &plan_Sij
+				&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &pi_mg, &pi_mg_prime, &chi, &Bi, &T00_mg, &T0i_mg, &Tij_mg ,&source, &Sij, &scalarFT, &scalarFT_pi, &scalarFT_pi_mg_prime, &BiFT, &T00_mgFT, &T0i_mgFT, &Tij_mgFT, &SijFT, &plan_phi, &plan_pi_mg , &plan_pi_mg_prime, &plan_chi, &plan_Bi, &plan_T00_mg, &plan_T0i_mg, &plan_Tij_mg, &plan_source, &plan_Sij
 #ifdef CHECK_B
 				, &Bi_check, &BiFT_check, &plan_Bi_check
 #endif
@@ -843,7 +858,6 @@ ref_time = MPI_Wtime();
 			pkcount++;
 		}
 
-    // cout<<"EXACT_OUTPUT_REDSHIFTS: "<<EXACT_OUTPUT_REDSHIFTS<<endl;
     #ifdef EXACT_OUTPUT_REDSHIFTS
     		tmp = a;
 				rungekutta4bg(tmp, fourpiG,
@@ -867,7 +881,7 @@ ref_time = MPI_Wtime();
     #ifdef HAVE_CLASS
     					class_background, class_perturbs, ic,
     #endif
-    					&pcls_cdm, &pcls_b, pcls_ncdm, &phi,&pi_k, &zeta_half, &chi, &Bi,&T00_Kess, &T0i_Kess, &Tij_Kess, &source, &Sij, &scalarFT ,&scalarFT_pi, &scalarFT_zeta_half, &BiFT, &T00_KessFT, &T0i_KessFT, &Tij_KessFT, &SijFT, &plan_phi, &plan_pi_k, &plan_zeta_half, &plan_chi, &plan_Bi, &plan_T00_Kess, &plan_T0i_Kess, &plan_Tij_Kess, &plan_source, &plan_Sij
+    					&pcls_cdm, &pcls_b, pcls_ncdm, &phi,&pi_mg, &pi_mg_prime, &chi, &Bi,&T00_mg, &T0i_mg, &Tij_mg, &source, &Sij, &scalarFT ,&scalarFT_pi, &scalarFT_pi_mg_prime, &BiFT, &T00_mgFT, &T0i_mgFT, &Tij_mgFT, &SijFT, &plan_phi, &plan_pi_mg, &plan_pi_mg_prime, &plan_chi, &plan_Bi, &plan_T00_mg, &plan_T0i_mg, &plan_Tij_mg, &plan_source, &plan_Sij
     #ifdef CHECK_B
     					, &Bi_check, &BiFT_check, &plan_Bi_check
     #endif
@@ -934,77 +948,72 @@ ref_time = MPI_Wtime();
 			COUT << endl;
 		}
 
-		//Kessence
+		//mg
 #ifdef BENCHMARK
 		ref_time = MPI_Wtime();
 #endif
 
 
 //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)
-// EFT of k-essence theory
+// EFT of mg theory
 //gravity theory = EFT &&  MG treatment   != hiclass
-if (cosmo.MG_theory == 1 && cosmo.MG_treatment==1  )
+if (cosmo.theory_mg == 1 && cosmo.treatment_mg==1  )
 {
   if(cycle==0)
   {
-  if(parallel.isRoot())  cout << "\033[1;34m The EFT approach equations including the MG part are being solved! n_field_update is set to: \033[0m "<<sim.nKe_numsteps<<endl;
+  if(parallel.isRoot())  cout << "\033[1;34m The EFT approach equations including the MG part are being solved! n_field_update is set to: \033[0m "<<cosmo.n_mg_numsteps<<endl;
   }
   //**********************
-  //Kessence - LeapFrog:START
+  //mg - LeapFrog:START
   //**********************
-    double a_kess=a;
-    //First we update zeta_half to have it at -1/2 just in the first loop
+    double a_mg=a;
+    //First we update pi_mg_prime to have it at -1/2 just in the first loop
     if(cycle==0)
     {
-       update_pi_prime_EFT(-dtau/ (2. * sim.nKe_numsteps), dx, a_kess, fourpiG, gsl_spline_eval(H_spline, 1., acc), phi, phi_old, chi, chi_old, pi_k, zeta_half, deltaPm, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(H_prime_prime_spline, a_kess, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_prime_spline, a_kess, acc), gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
-       zeta_half.updateHalo();
+      // Note that all the gsl_spline_eval ones are the class columns in class units so we need to ocnvert the units consistently
+       update_pi_prime_EFT(-dtau/ (2.), dx, a_mg, fourpiG, gsl_spline_eval(H_spline, 1., acc), phi, phi_old, chi, chi_old, pi_mg, pi_mg_prime, deltaPm, Hconf(a_mg, fourpiG, H_spline, acc),  gsl_spline_eval(H_prime_spline, a_mg, acc), gsl_spline_eval(H_prime_prime_spline, a_mg, acc), gsl_spline_eval(rho_smg_spline, a_mg, acc), gsl_spline_eval(p_smg_spline, a_mg, acc), gsl_spline_eval(p_smg_prime_spline, a_mg, acc), gsl_spline_eval(alpha_K_spline, a_mg, acc) , gsl_spline_eval(alpha_B_spline, a_mg, acc), gsl_spline_eval(alpha_K_prime_spline, a_mg, acc), gsl_spline_eval(alpha_B_prime_spline, a_mg, acc));
+       pi_mg_prime.updateHalo();
     }
 
-   //Then fwe start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)]
-   for (i=0;i<sim.nKe_numsteps;i++)
+   //Then we start the main loop zeta is updated to get zeta(n+1/2) from pi(n) and zeta(n-1/2)]
+   for (i=0;i<cosmo.n_mg_numsteps;i++)
    {
-      //********************************************************************************
-      //Updating zeta_integer to get zeta_integer(n+1/2) and zeta_integer(n+1), in the first loop is getting zeta_integer(1/2) and zeta_integer(1)
-      // In sum: zeta_integer(n+1/2) = zeta_integer(n-1/2)+ zeta_integer'(n)dtau which needs background to be at n with then
-      //Note that here for zeta_integer'(n) we need background to be at n and no need to update it.
-      //\zeta_integer(n+1/2) = \zeta_integer(n-1/2) + \zeta_integer'(n)  dtau
-      //We also update zeta_int from n to n+1
-      //********************************************************************************
+      //************************************************************************
 
-      update_pi_prime_EFT(dtau/ sim.nKe_numsteps,  dx, a_kess, fourpiG, gsl_spline_eval(H_spline, 1., acc), phi, phi_old, chi, chi_old, pi_k, zeta_half, deltaPm, Hconf(a_kess, fourpiG, H_spline, acc), Hconf_prime(a_kess, fourpiG, H_spline, acc), gsl_spline_eval(H_prime_prime_spline, a_kess, acc), gsl_spline_eval(rho_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_spline, a_kess, acc), gsl_spline_eval(p_smg_prime_spline, a_kess, acc), gsl_spline_eval(alpha_K, a_kess, acc) , gsl_spline_eval(alpha_B, a_kess, acc), gsl_spline_eval(alpha_K_prime, a_kess, acc), gsl_spline_eval(alpha_B_prime, a_kess, acc));
-      zeta_half.updateHalo();
+      update_pi_prime_EFT(dtau/ cosmo.n_mg_numsteps,  dx, a_mg, fourpiG, gsl_spline_eval(H_spline, 1., acc), phi, phi_old, chi, chi_old, pi_mg, pi_mg_prime, deltaPm, Hconf(a_mg, fourpiG, H_spline, acc),  gsl_spline_eval(H_prime_spline, a_mg, acc), gsl_spline_eval(H_prime_prime_spline, a_mg, acc), gsl_spline_eval(rho_smg_spline, a_mg, acc), gsl_spline_eval(p_smg_spline, a_mg, acc), gsl_spline_eval(p_smg_prime_spline, a_mg, acc), gsl_spline_eval(alpha_K_spline, a_mg, acc) , gsl_spline_eval(alpha_B_spline, a_mg, acc), gsl_spline_eval(alpha_K_prime_spline, a_mg, acc), gsl_spline_eval(alpha_B_prime_spline, a_mg, acc));
+      pi_mg_prime.updateHalo();
       //********************************************************************************
       //Since we have pi(n+1)=pi(n) + pi'(n+1/2), and in pi'(n+1/2) we have H(n+1/2) we update the background before updating the pi to have H(n+1/2), Moreover zeta(n+1) = zeta(n+1/2) + zeta'(n+1/2), so we put zeta_int updating in the pi updating!
-      //********************************************************************************
-     rungekutta4bg(a_kess, fourpiG,
-       #ifdef HAVE_CLASS_BG
-         H_spline, acc,
-       #else
-         cosmo,
-       #endif
-       dtau  / sim.nKe_numsteps / 2.0);
-      //********************************************************************************
+      //********************************************************************************/
+      rungekutta4bg(a_mg, fourpiG,
+        #ifdef HAVE_CLASS_BG
+          H_spline, acc,
+        #else
+          cosmo,
+        #endif
+        dtau  / cosmo.n_mg_numsteps/2.);
+
       //we update pi to have it at n+1 (at first loop from the value at (0) and the value of zeta_integer at 1/2 and H(n+1/2) we update pi at (1))
-      //In the pi update we also update zeta_int because we need the values of a_kess and H_kess at step n+1/2
+      //In the pi update we also update zeta_int because we need the values of a_mg and H_mg at step n+1/2
       //By the below update we get pi(n+1) and zeta(n+1)
       //********************************************************************************
-      update_pi_EFT(dtau/ sim.nKe_numsteps, pi_k, zeta_half);
-      pi_k.updateHalo();
+      update_pi_EFT(dtau/ cosmo.n_mg_numsteps, pi_mg, pi_mg_prime);
+      pi_mg.updateHalo();
       //********************************************************************************
-      // Now we have pi(n+1) and a_kess(n+1/2) so we update background by halfstep to have a_kess(n+1)
+      // Now we have pi(n+1) and a_mg(n+1/2) so we update background by halfstep to have a_mg(n+1)
       //********************************************************************************
-     rungekutta4bg(a_kess, fourpiG,
+     rungekutta4bg(a_mg, fourpiG,
        #ifdef HAVE_CLASS_BG
          H_spline, acc,
        #else
          cosmo,
        #endif
-       dtau  / sim.nKe_numsteps / 2.0);
+       dtau  / cosmo.n_mg_numsteps/2.);
       }
 
 
   #ifdef BENCHMARK
-      kessence_update_time += MPI_Wtime() - ref_time;
+      mg_update_time += MPI_Wtime() - ref_time;
       ref_time = MPI_Wtime();
   #endif
   //**********************
@@ -1014,14 +1023,11 @@ if (cosmo.MG_theory == 1 && cosmo.MG_treatment==1  )
 
 
 #ifdef BENCHMARK
-    kessence_update_time += MPI_Wtime() - ref_time;
+    mg_update_time += MPI_Wtime() - ref_time;
     ref_time = MPI_Wtime();
 #endif
 
 
-    //
-		// for (j = 0; j < numsteps; j++) // particle update
-		// {
 #ifdef BENCHMARK
 		ref2_time = MPI_Wtime();
 #endif
@@ -1159,11 +1165,11 @@ if (cosmo.MG_theory == 1 && cosmo.MG_treatment==1  )
 				if (sim.vector_flag == VECTOR_ELLIPTIC)
 				{
 					plan_Bi_check.execute(FFT_BACKWARD);
-					hibernate(sim, ic, cosmo, &pcls_cdm, &pcls_b, pcls_ncdm, phi, pi_k, zeta_half, chi, Bi_check, a, tau, dtau, cycle);
+					hibernate(sim, ic, cosmo, &pcls_cdm, &pcls_b, pcls_ncdm, phi, pi_mg, pi_mg_prime, chi, Bi_check, a, tau, dtau, cycle);
 				}
 				else
 #endif
-				hibernate(sim, ic, cosmo, &pcls_cdm, &pcls_b, pcls_ncdm, phi, pi_k, zeta_half, chi, Bi, a, tau, dtau, cycle);
+				hibernate(sim, ic, cosmo, &pcls_cdm, &pcls_b, pcls_ncdm, phi, pi_mg, pi_mg_prime, chi, Bi, a, tau, dtau, cycle);
 				break;
 			}
 		}
@@ -1177,11 +1183,11 @@ if (cosmo.MG_theory == 1 && cosmo.MG_treatment==1  )
 			if (sim.vector_flag == VECTOR_ELLIPTIC)
 			{
 				plan_Bi_check.execute(FFT_BACKWARD);
-				hibernate(sim, ic, cosmo, &pcls_cdm, &pcls_b, pcls_ncdm, phi, pi_k, zeta_half, chi, Bi, a, tau, dtau, cycle, restartcount);
+				hibernate(sim, ic, cosmo, &pcls_cdm, &pcls_b, pcls_ncdm, phi, pi_mg, pi_mg_prime, chi, Bi, a, tau, dtau, cycle, restartcount);
 			}
 			else
 #endif
-			hibernate(sim, ic, cosmo, &pcls_cdm, &pcls_b, pcls_ncdm, phi, pi_k, zeta_half, chi, Bi, a, tau, dtau, cycle, restartcount);
+			hibernate(sim, ic, cosmo, &pcls_cdm, &pcls_b, pcls_ncdm, phi, pi_mg, pi_mg_prime, chi, Bi, a, tau, dtau, cycle, restartcount);
 			restartcount++;
 		}
 
@@ -1233,7 +1239,7 @@ if (cosmo.MG_theory == 1 && cosmo.MG_treatment==1  )
 	parallel.sum(spectra_output_time);
 	parallel.sum(lightcone_output_time);
 	parallel.sum(gravity_solver_time);
-  parallel.sum(kessence_update_time);
+  parallel.sum(mg_update_time);
 	parallel.sum(fft_time);
 	parallel.sum(update_q_time);
 	parallel.sum(moveParts_time);
@@ -1248,8 +1254,8 @@ if (cosmo.MG_theory == 1 && cosmo.MG_treatment==1  )
 	COUT << "----------- main loop: components -----------"<<endl;
 
 	COUT << "projections                : "<< hourMinSec(projection_time) << " ; " << 100. * projection_time/cycle_time <<"%."<<endl;
-  //Kessence update
-  COUT << "Kessence_update                : "<< hourMinSec(kessence_update_time) << " ; " << 100. * kessence_update_time/cycle_time <<"%."<<endl;
+  //mg update
+  COUT << "mg_update                : "<< hourMinSec(mg_update_time) << " ; " << 100. * mg_update_time/cycle_time <<"%."<<endl;
 	COUT << "snapshot outputs           : "<< hourMinSec(snapshot_output_time) << " ; " << 100. * snapshot_output_time/cycle_time <<"%."<<endl;
 	COUT << "lightcone outputs          : "<< hourMinSec(lightcone_output_time) << " ; " << 100. * lightcone_output_time/cycle_time <<"%."<<endl;
 	COUT << "power spectra outputs      : "<< hourMinSec(spectra_output_time) << " ; " << 100. * spectra_output_time/cycle_time <<"%."<<endl;

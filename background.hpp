@@ -156,8 +156,8 @@ double Hconf(const double a, const double fourpiG,
 	return norm*a*Ha;
 	#else
 	return sqrt((2. * fourpiG / 3.) * (((cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) / a) + (cosmo.Omega_Lambda * a * a)
-	+ (cosmo.Omega_rad / a / a)+ (cosmo.Omega_kessence * pow(a,-3.-3. * cosmo.w_kessence)* a * a)));
-	// cout<<"Omega_rad: "<<cosmo.Omega_rad<<" cosmo.Omega_Lambda"<<cosmo.Omega_Lambda<<endl;
+	+ (cosmo.Omega_rad / a / a)+ (cosmo.Omega_fld * pow(a,-3.-3. * cosmo.w0_fld)* a * a)));
+	cout<<"cosmo.Omega_fld: "<<cosmo.Omega_fld<<" cosmo.w_fld"<<cosmo.w0_fld<<endl;
 	#endif
 }
 
@@ -165,14 +165,14 @@ double Hconf(const double a, const double fourpiG,
 // So Omega_m is the matter density at arbitrary redshift and is not normalized, since we did not use Hconf in the fomrula
 // While Hconf is normalized to critical density 1 so H^2/H_0^2= H^2/(8piG/3) which is used in the last formula.
 //TODO: check where this is used and take it from Class
-double Omega_m(const double a, const cosmology cosmo) { return cosmo.Omega_m / (cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo) + cosmo.Omega_kessence * pow(a,-3.-3. * cosmo.w_kessence)* a * a * a + cosmo.Omega_Lambda * a * a * a + cosmo.Omega_rad / a); }
+double Omega_m(const double a, const cosmology cosmo) { return cosmo.Omega_m / (cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo) + cosmo.Omega_fld * pow(a,-3.-3. * cosmo.w0_fld)* a * a * a + cosmo.Omega_Lambda * a * a * a + cosmo.Omega_rad / a); }
 //
 //TODO: check where this is used and take it from Class
-double Omega_rad(const double a, const cosmology cosmo) { return (cosmo.Omega_rad + (bg_ncdm(a, cosmo) + cosmo.Omega_cdm + cosmo.Omega_b - cosmo.Omega_m) * a) / ((cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) * a + cosmo.Omega_kessence * pow(a,-3.-3. * cosmo.w_kessence)* a * a * a * a + cosmo.Omega_Lambda * a * a * a * a + cosmo.Omega_rad); }
+double Omega_rad(const double a, const cosmology cosmo) { return (cosmo.Omega_rad + (bg_ncdm(a, cosmo) + cosmo.Omega_cdm + cosmo.Omega_b - cosmo.Omega_m) * a) / ((cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) * a + cosmo.Omega_fld * pow(a,-3.-3. * cosmo.w0_fld)* a * a * a * a + cosmo.Omega_Lambda * a * a * a * a + cosmo.Omega_rad); }
 
 //Here Omega_Lambda is just Lambda
 //TODO: check where this is used and take it from Class
-double Omega_Lambda(const double a, const cosmology cosmo) { return cosmo.Omega_Lambda / ((cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) / a / a / a + cosmo.Omega_Lambda + cosmo.Omega_kessence * pow(a,-3.-3. * cosmo.w_kessence) + cosmo.Omega_rad / a / a / a / a);}
+double Omega_Lambda(const double a, const cosmology cosmo) { return cosmo.Omega_Lambda / ((cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) / a / a / a + cosmo.Omega_Lambda + cosmo.Omega_fld * pow(a,-3.-3. * cosmo.w0_fld) + cosmo.Omega_rad / a / a / a / a);}
 
 //TODO: remove this
 double Hconf_class(const double a, const cosmology cosmo)
@@ -180,7 +180,7 @@ double Hconf_class(const double a, const cosmology cosmo)
   double H0_class=100*cosmo.h/(C_SPEED_OF_LIGHT*100.);
  //0.00022593979933110373; // H0 in unit of 1/Mpc H0=100h/c;
 	return H0_class * sqrt( ((cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) / a) + (cosmo.Omega_Lambda * a * a)
-	+ (cosmo.Omega_rad / a / a)+ (cosmo.Omega_kessence * pow(a,-3.-3. * cosmo.w_kessence)* a * a) );
+	+ (cosmo.Omega_rad / a / a)+ (cosmo.Omega_fld * pow(a,-3.-3. * cosmo.w0_fld)* a * a) );
 }
 
 //////////////////////////
@@ -200,31 +200,31 @@ double Hconf_class(const double a, const cosmology cosmo)
 //
 //////////////////////////
 // Hconf normalized to critial density so we have H0^2= 8piG/3
-double Hconf_prime(const double a, const double fourpiG,
-	#ifdef HAVE_CLASS_BG
-	gsl_spline * H_spline, gsl_interp_accel * acc
-	#else
-	const cosmology cosmo
-	#endif
-)
-{
-	#ifdef HAVE_CLASS_BG
-	double norm = sqrt(2./3.*fourpiG)/gsl_spline_eval(H_spline, 1., acc);
-	double Hc = Hconf(a, fourpiG,
-		#ifdef HAVE_CLASS_BG
-		H_spline, acc
-		#else
-		cosmo
-		#endif
-		);
-	// dHc/da = H + a*d(H)/da
-	double dHcda = Hc/a + a*norm*gsl_spline_eval_deriv(H_spline, a, acc);
-	// dHconf/dtau = a*Hc*dHc/da
-	return a*Hc*dHcda;
-	#else
-	return (2. * fourpiG / (6. * a * a)) * (  -(cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) * a + 2. * cosmo.Omega_Lambda * a *  a * a * a - 2. * cosmo.Omega_rad - (1. + 3. * cosmo.w_kessence) * cosmo.Omega_kessence * pow( a, 1.-3.* cosmo.w_kessence));
-	#endif
-}
+// double Hconf_prime(const double a, const double fourpiG,
+// 	#ifdef HAVE_CLASS_BG
+// 	gsl_spline * H_spline, gsl_interp_accel * acc
+// 	#else
+// 	const cosmology cosmo
+// 	#endif
+// )
+// {
+// 	#ifdef HAVE_CLASS_BG
+// 	double norm = sqrt(2./3.*fourpiG)/gsl_spline_eval(H_spline, 1., acc);
+// 	double Hc = Hconf(a, fourpiG,
+// 		#ifdef HAVE_CLASS_BG
+// 		H_spline, acc
+// 		#else
+// 		cosmo
+// 		#endif
+// 		);
+// 	// dHc/da = H + a*d(H)/da
+// 	double dHcda = Hc/a + a*norm*gsl_spline_eval_deriv(H_spline, a, acc);
+// 	// dHconf/dtau = a*Hc*dHc/da
+// 	return a*Hc*dHcda;
+// 	#else
+// 	return (2. * fourpiG / (6. * a * a)) * (  -(cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) * a + 2. * cosmo.Omega_Lambda * a *  a * a * a - 2. * cosmo.Omega_rad - (1. + 3. * cosmo.w0_fld) * cosmo.Omega_fld * pow( a, 1.-3.* cosmo.w0_fld));
+// 	#endif
+// }
 
 //////////////////////////
 // rungekutta4bg

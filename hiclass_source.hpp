@@ -111,7 +111,7 @@ void projection_T00_project(background & class_background, perturbs & class_pert
 		gsl_spline_free(tk2);
 	}
 
-	if (a < 1. && cosmo.Omega_kessence > 0 && sim.fluid_flag == 1)
+	if (a < 1. && cosmo.Omega_fld > 0 && sim.fluid_flag == 1)
 	{
     cout<<"ERROR: You cannot ask for class dark energy perturbations in KGBevolution!";
     parallel.abortForce();
@@ -186,7 +186,7 @@ void projection_T00_project(background & class_background, perturbs & class_pert
 				);
 
 			for (i = 0; i < n; i++)
-				delta[i] -= coeff * (4. * Omega_rad / a + 3. * Omega_ncdm + 3. * (1. + cosmo.w_kessence) * Omega_fld) * rescale * M_PI * tk2->y[i] * sqrt(Pk_primordial(tk2->x[i] * cosmo.h / sim.boxsize, ic) / tk2->x[i]) / tk2->x[i] / tk2->x[i] / tk2->x[i];
+				delta[i] -= coeff * (4. * Omega_rad / a + 3. * Omega_ncdm + 3. * (1. + cosmo.w0_fld) * Omega_fld) * rescale * M_PI * tk2->y[i] * sqrt(Pk_primordial(tk2->x[i] * cosmo.h / sim.boxsize, ic) / tk2->x[i]) / tk2->x[i] / tk2->x[i] / tk2->x[i];
 
 			gsl_spline_free(tk1);
 			gsl_spline_free(tk2);

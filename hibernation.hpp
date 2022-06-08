@@ -82,9 +82,9 @@ void writeRestartSettings(metadata & sim, icsettings & ic, cosmology & cosmo, co
 		{
 			fprintf(outfile, "metric file        = %s%s%s_phi.h5", sim.restart_path, sim.basename_restart, buffer);
 
-			//Kessence
-			fprintf(outfile, "k-essence field        = %s%s%s_pi_k.h5", sim.restart_path, sim.basename_restart, buffer);
-			fprintf(outfile, "k-essence field        = %s%s%s_zeta_k.h5", sim.restart_path, sim.basename_restart, buffer);
+			//mg
+			fprintf(outfile, "mg field        = %s%s%s_pi_mg.h5", sim.restart_path, sim.basename_restart, buffer);
+			fprintf(outfile, "mg field        = %s%s%s_pi_mg_prime.h5", sim.restart_path, sim.basename_restart, buffer);
 
 			fprintf(outfile, ", %s%s%s_chi.h5", sim.restart_path, sim.basename_restart, buffer);
 			if (sim.vector_flag == VECTOR_PARABOLIC)
@@ -123,19 +123,19 @@ void writeRestartSettings(metadata & sim, icsettings & ic, cosmology & cosmo, co
 		fprintf(outfile, "Omega_b   = %.15le\n", cosmo.Omega_b);
 		fprintf(outfile, "Omega_g   = %.15le\n", cosmo.Omega_g);
 		fprintf(outfile, "Omega_ur  = %.15le\n", cosmo.Omega_ur);
-		// if (cosmo.Omega_fld > 0.)
-		// {
-		// 	fprintf(outfile, "Omega_fld = %.15le\n", cosmo.Omega_fld);
-		// 	fprintf(outfile, "w0_fld    = %lg\n", cosmo.w0_fld);
-		// 	fprintf(outfile, "wa_fld    = %lg\n", cosmo.wa_fld);
-		// 	if (sim.fluid_flag > 0)
-		// 		fprintf(outfile, "cs2_fld   = %lg\n", cosmo.cs2_fld);
-		// }
+		if (cosmo.Omega_fld > 0.)
+		{
+			fprintf(outfile, "Omega_fld = %.15le\n", cosmo.Omega_fld);
+			fprintf(outfile, "w0_fld    = %lg\n", cosmo.w0_fld);
+			fprintf(outfile, "wa_fld    = %lg\n", cosmo.wa_fld);
+			if (sim.fluid_flag > 0)
+				fprintf(outfile, "cs2_fld   = %lg\n", cosmo.cs2_fld);
+		}
 		fprintf(outfile, "N_ncdm    = %d\n", cosmo.num_ncdm);
 		//Kessence
-		fprintf(outfile, "Omega_kessence   = %.15le\n", cosmo.w_kessence);
-		fprintf(outfile, "w_kessence   = %.15le\n", cosmo.Omega_b);
-		fprintf(outfile, "cs2_kessence   = %.15le\n", cosmo.cs2_kessence);
+		// fprintf(outfile, "Omega_kessence   = %.15le\n", cosmo.w_kessence);
+		// fprintf(outfile, "w_kessence   = %.15le\n", cosmo.Omega_b);
+		// fprintf(outfile, "cs2_kessence   = %.15le\n", cosmo.cs2_kessence);
 		//TODO: change this with background integration (hi_class)
 
 		if (cosmo.num_ncdm > 0)
@@ -205,23 +205,23 @@ void writeRestartSettings(metadata & sim, icsettings & ic, cosmology & cosmo, co
 			if(sim.out_snapshot & MASK_PHI)
 			{
 				fprintf(outfile, "phi");
-				if (sim.out_snapshot > MASK_PI_K)
+				if (sim.out_snapshot > MASK_PI_MG)
 					fprintf(outfile, ", ");
 			}
 			//Kessence
-			if(sim.out_snapshot & MASK_PI_K)
+			if(sim.out_snapshot & MASK_PI_MG)
 			{
-				fprintf(outfile, "pi_k");
-				if (sim.out_snapshot > MASK_ZETA)
+				fprintf(outfile, "pi_mg");
+				if (sim.out_snapshot > MASK_PI_MG_PRIME)
 					fprintf(outfile, ", ");
 			}
-			if(sim.out_snapshot & MASK_ZETA)
+			if(sim.out_snapshot & MASK_PI_MG_PRIME)
 			{
-				fprintf(outfile, "zeta_k");
+				fprintf(outfile, "pi_mg_prime");
 				if (sim.out_snapshot > MASK_CHI)
 					fprintf(outfile, ", ");
 			}
-			//kessence end
+			//MG end
 			if(sim.out_snapshot & MASK_CHI)
 			{
 				fprintf(outfile, "chi");
@@ -326,23 +326,23 @@ void writeRestartSettings(metadata & sim, icsettings & ic, cosmology & cosmo, co
 			{
       //Kessence
 				fprintf(outfile, "phi");
-				if (sim.out_pk > MASK_PI_K)
+				if (sim.out_pk > MASK_PI_MG)
 					fprintf(outfile, ", ");
 			}
-			//Kessence
-			if(sim.out_snapshot & MASK_PI_K)
+			//MG
+			if(sim.out_snapshot & MASK_PI_MG)
 			{
-				fprintf(outfile, "pi_k");
-				if (sim.out_snapshot > MASK_ZETA)
+				fprintf(outfile, "pi_mg");
+				if (sim.out_snapshot > MASK_PI_MG_PRIME)
 					fprintf(outfile, ", ");
 			}
-			if(sim.out_snapshot & MASK_ZETA)
+			if(sim.out_snapshot & MASK_PI_MG_PRIME)
 			{
-				fprintf(outfile, "zeta");
+				fprintf(outfile, "pi_mg_prime");
 				if (sim.out_snapshot > MASK_CHI)
 					fprintf(outfile, ", ");
 			}
-			//kessence end
+			//MG end
 			if(sim.out_pk & MASK_CHI)
 			{
 				fprintf(outfile, "chi");
@@ -549,7 +549,7 @@ void writeRestartSettings(metadata & sim, icsettings & ic, cosmology & cosmo, co
 //
 //////////////////////////
 
-void hibernate(metadata & sim, icsettings & ic, cosmology & cosmo, Particles<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> & phi, Field<Real> & pi_k,Field<Real> & zeta, Field<Real> & chi, Field<Real> & Bi, const double a, const double tau, const double dtau, const int cycle, const int restartcount = -1)
+void hibernate(metadata & sim, icsettings & ic, cosmology & cosmo, Particles<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> & phi, Field<Real> & pi_mg,Field<Real> & pi_mg_prime, Field<Real> & chi, Field<Real> & Bi, const double a, const double tau, const double dtau, const int cycle, const int restartcount = -1)
 {
 	string h5filename;
 	char buffer[5];
@@ -593,9 +593,9 @@ void hibernate(metadata & sim, icsettings & ic, cosmology & cosmo, Particles<par
 	if (sim.gr_flag > 0)
 	{
 		phi.saveHDF5_server_open(h5filename + "_phi");
-		//kessence
-		pi_k.saveHDF5_server_open(h5filename + "_pi_k");
-		zeta.saveHDF5_server_open(h5filename + "_zeta");
+		//MG
+		pi_mg.saveHDF5_server_open(h5filename + "_pi_mg");
+		pi_mg_prime.saveHDF5_server_open(h5filename + "_pi_mg_prime");
 		chi.saveHDF5_server_open(h5filename + "_chi");
 	}
 
@@ -641,9 +641,9 @@ void hibernate(metadata & sim, icsettings & ic, cosmology & cosmo, Particles<par
 	if (sim.gr_flag > 0)
 	{
 		phi.saveHDF5(h5filename + "_phi.h5");
-		//kessence
-		pi_k.saveHDF5(h5filename + "_pi_k.h5");
-		zeta.saveHDF5(h5filename + "_zeta.h5");
+		//MG
+		pi_mg.saveHDF5(h5filename + "_pi_mg.h5");
+		pi_mg_prime.saveHDF5(h5filename + "_pi_mg_prime.h5");
 		chi.saveHDF5(h5filename + "_chi.h5");
 	}
 

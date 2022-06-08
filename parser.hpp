@@ -660,10 +660,10 @@ bool parseFieldSpecifiers(parameter * & params, const int numparam, const char *
           //Kessence part
 				else if (strcmp(item, "phi_prime") == 0 || strcmp(item, "Phi_prime") == 0)
 						pvalue |= MASK_PHI_PRIME;
-				else if (strcmp(item, "pi_k") == 0 || strcmp(item, "Pi_k") == 0)
-					pvalue |= MASK_PI_K;
-				else if (strcmp(item, "zeta") == 0 || strcmp(item, "zeta") == 0)
-					pvalue |= MASK_ZETA;
+				else if (strcmp(item, "pi_mg") == 0 || strcmp(item, "Pi_mg") == 0)
+					pvalue |= MASK_PI_MG;
+				else if (strcmp(item, "pi_mg_prime") == 0 || strcmp(item, "Pi_mg_prime") == 0)
+					pvalue |= MASK_PI_MG_PRIME;
           //Kessence end
 				else if (strcmp(item, "Chi") == 0 || strcmp(item, "chi") == 0)
 					pvalue |= MASK_CHI;
@@ -695,14 +695,14 @@ bool parseFieldSpecifiers(parameter * & params, const int numparam, const char *
 					pvalue |= MASK_DBARE;
 				else if (strcmp(item, "v") == 0 || strcmp(item, "velocity") == 0)
 					pvalue |= MASK_VEL;
-          //kessence part
-				else if (strcmp(item, "T_Kess") == 0 || strcmp(item, "T_Kessence") == 0)
-					pvalue |= MASK_T_KESS;
+          //MG part
+				else if (strcmp(item, "T_MG") == 0 || strcmp(item, "T_MG") == 0)
+					pvalue |= MASK_T_MG;
 
-				else if (strcmp(item, "Delta_Kess") == 0 || strcmp(item, "delta_Kessence") == 0)
-					pvalue |= MASK_Delta_KESS;
-        else if (strcmp(item, "Cross_dkess_dm") == 0 || strcmp(item, "Cross_dkess_dmatter") == 0)
-          pvalue |= MASK_DELTAKESS_DELTA;
+				else if (strcmp(item, "Delta_MG") == 0 || strcmp(item, "delta_MG") == 0)
+					pvalue |= MASK_DELTA_MG;
+        else if (strcmp(item, "Cross_dMG_dm") == 0 || strcmp(item, "Cross_dkess_dmatter") == 0)
+          pvalue |= MASK_DELTA_MG_DELTA;
 
 					//Kessence end
 				start = comma+1;
@@ -711,13 +711,13 @@ bool parseFieldSpecifiers(parameter * & params, const int numparam, const char *
 
 			if (strcmp(start, "Phi") == 0 || strcmp(start, "phi") == 0)
 				pvalue |= MASK_PHI;
-      //kessence part
+      //MG part
 			else if (strcmp(start, "Phi_prime") == 0 || strcmp(start, "phi_prime") == 0)
 				pvalue |= MASK_PHI_PRIME;
-			else if (strcmp(start, "Pi_k") == 0 || strcmp(start, "pi_k") == 0)
-				pvalue |= MASK_PI_K;
-			else if (strcmp(start, "zeta") == 0 || strcmp(start, "zeta") == 0)
-				pvalue |= MASK_ZETA;
+			else if (strcmp(start, "Pi_mg") == 0 || strcmp(start, "pi_mg") == 0)
+				pvalue |= MASK_PI_MG;
+			else if (strcmp(start, "pi_mg_prime") == 0 || strcmp(start, "Pi_mg_prime") == 0)
+				pvalue |= MASK_PI_MG_PRIME;
         //Kessence end
 			else if (strcmp(start, "Chi") == 0 || strcmp(start, "chi") == 0)
 				pvalue |= MASK_CHI;
@@ -794,10 +794,10 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
 
 	ic.pkfile[0] = '\0';
 	ic.tkfile[0] = '\0';
-	//kessence part
-  ic.IC_MG = 1;
-	ic.tk_kessence[0]='\0';
-	//kessence end
+	//MG part
+  ic.IC_mg = 1;
+	ic.tk_mg[0]='\0';
+	//MG end
 	ic.metricfile[0][0] = '\0';
 	ic.metricfile[1][0] = '\0';
 	ic.metricfile[2][0] = '\0';
@@ -815,21 +815,21 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
 	ic.restart_version = -1.;
 
 	parseParameter(params, numparam, "seed", ic.seed);
-  if (parseParameter(params, numparam, "IC generator MG", par_string))
+  if (parseParameter(params, numparam, "IC generator mg", par_string))
   {
     if (par_string[0] == 'h' || par_string[0] == 'H')
     {
-      ic.IC_MG = 1;
+      ic.IC_mg = 1;
       COUT<<"The IC for the fields including v_x_smg is set using hiclass"<<endl;
     }
     else if (par_string[0] == 'f' || par_string[0] == 'F')
     {
-      ic.IC_MG = 0;
+      ic.IC_mg = 0;
       COUT<<"The IC for the fields including v_x_smg is set using a file!"<<endl;
     }
     else
     {
-      ic.IC_MG = 1;
+      ic.IC_mg = 1;
       COUT<<"NO IC for the fields are defined, the default (hiclass) being used!"<<endl;
     }
   }
@@ -1310,10 +1310,10 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
 	if (sim.num_snapshot > 0)
 		qsort((void *) sim.z_snapshot, (size_t) sim.num_snapshot, sizeof(double), sort_descending);
 
-    // kessence snapshots for blowup
-    if (!parseParameter(params, numparam, "num_snapshot_kess",  sim.num_snapshot_kess))
+    // MG snapshots for blowup
+    if (!parseParameter(params, numparam, "num_snapshot_mg",  sim.num_snapshot_mg))
       {
-          sim.num_snapshot_kess=0;
+          sim.num_snapshot_mg=0;
       }
 
 	parseParameter(params, numparam, "Pk redshifts", sim.z_pk, sim.num_pk);
@@ -1674,56 +1674,54 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
   {
     if (par_string[0] == 'E' || par_string[0] == 'e')
     {
-      cosmo.MG_theory = 1; // EFT MG gravity
-      COUT<<"The gravity_model is set to \033[1;32m EFT_modeling in hiclass \033[0m"<<endl;
-    }
-    else if (par_string[0] == 'k' || par_string[0] == 'K')
-    {
-      cosmo.MG_theory=2; // k-essence either covariant or EFT
-      COUT<<"The gravity_model is set to \033[1;32m k-essence \033[0m"<<endl;
-    }
-    else if (par_string[0] == '0' || par_string[0] == '0')
-    {
-      cosmo.MG_theory = 0; // NO MG requested
-      COUT<<"\033[1;32m No modified gravity is requested! \033[0m"<<endl;
+      cosmo.theory_mg = 1; // EFT MG gravity
+      COUT<<"The gravity_model is set to \033[1;34m EFT_modeling in hiclass \033[0m"<<endl;
     }
     else  // default is
     {
-      cosmo.MG_theory = 1; //// EFT MG gravity
-      COUT<<"No gravity model is specified! The gravity_model is set to default \033[1;32m EFT_modeling in hiclass \033[0m"<<endl;
-    }
+      COUT << "\033[1;31m ERROR:\n";
+      COUT<< "The modified gravity theory is not specified! \033[0m" << endl;
+      parallel.abortForce();
   }
+}
 
-if (cosmo.MG_theory != 0)
+if (cosmo.theory_mg != 0)
 {
   if (parseParameter(params, numparam, "MG treatment", par_string))
   {
     if (par_string[0] == 'h' || par_string[0] == 'H')
     {
-      cosmo.MG_treatment=0; // hiclass-interface
-      COUT<<"The MG treatment is set to \033[1;32m hiclass-interface \033[0m"<<endl;
+      cosmo.treatment_mg=0; // hiclass-interface
+      COUT<<"The MG treatment is set to \033[1;34m hiclass-interface \033[0m"<<endl;
+      COUT << "\033[1;31m ERROR:\n";
+      COUT<< "In the current code you cannot use this option! \033[0m" << endl;
+      parallel.abortForce();
     }
     else if (par_string[0] == 'N' || par_string[0] == 'n')
     {
-      cosmo.MG_treatment=1; // Solving it here
-      COUT<<"The MG treatment is set to \033[1;32m N-body so the PDE is going to be solved \033[0m"<<endl;
+      cosmo.treatment_mg=1; // Solving it here
+      COUT<<"The MG treatment is set to \033[1;34m N-body so the PDE is going to be solved \033[0m"<<endl;
     }
     else
     {
-    cosmo.MG_treatment=2; // hiclass-interface The default is hiclass interface
-    COUT<<"\033[1;32m NO MG treatment \033[0m"<<endl;
+    COUT<<"The MG treatment is set to \033[1;34m hiclass-interface \033[0m"<<endl;
+    COUT << "\033[1;31m ERROR:\n";
+    COUT<< "In the current code you cannot use this option! \033[0m" << endl;
+    parallel.abortForce();
+    cosmo.treatment_mg=2; // hiclass-interface The default is hiclass interface
+    COUT<<"\033[1;34m NO MG treatment \033[0m"<<endl;
     }
   }
 }
 
-if (cosmo.MG_theory == 1) // EFT MG gravity
+if (cosmo.theory_mg == 1) // EFT MG gravity
 {
   if (parseParameter(params, numparam, "gravity_model", par_string))
   {
     if (par_string[0] == 'P' || par_string[0] == 'p')
     {
         cosmo.gravity_model=1; // There is only one option which is propto_omega
-        COUT<<"The gravity_model is set to \033[1;32m propto_omega \033[0m"<<endl;
+        COUT<<"The gravity_model is set to \033[1;34m propto_omega \033[0m"<<endl;
     }
     else
     {
@@ -1735,14 +1733,14 @@ if (cosmo.MG_theory == 1) // EFT MG gravity
     }
   }
 }
-  if (cosmo.MG_theory == 1) // EFT MG gravity
+  if (cosmo.theory_mg == 1) // EFT MG gravity
   {
     int num_alpha_params = 5;
     if(parseParameter(params, numparam, "parameters_smg", cosmo.x_i, num_alpha_params))
     {
       cosmo.x_k = cosmo.x_i[0];
       cosmo.x_b = cosmo.x_i[1];
-      COUT<<"The EFT parameters are: "<<"\033[1;32m alpha_k= \033[0m" << cosmo.x_k <<"\033[1;32m, alpha_B= \033[0m" << cosmo.x_b <<"\033[1;32m, alpha_M= \033[0m" << cosmo.x_i[2] <<"\033[1;32m, alpha_t= \033[0m" << cosmo.x_i[3]<<"\033[1;32m, M= \033[0m" << cosmo.x_i[4]<<endl;
+      COUT<<"The EFT parameters are: "<<"\033[1;34m alpha_k= \033[0m" << cosmo.x_k <<"\033[1;34m, alpha_B= \033[0m" << cosmo.x_b <<"\033[1;34m, alpha_M= \033[0m" << cosmo.x_i[2] <<"\033[1;34m, alpha_t= \033[0m" << cosmo.x_i[3]<<"\033[1;34m, M= \033[0m" << cosmo.x_i[4]<<endl;
     }
     int num_bg_params = 3;
     if(parseParameter(params, numparam, "expansion_smg", cosmo.bg_i, num_alpha_params))
@@ -1751,111 +1749,14 @@ if (cosmo.MG_theory == 1) // EFT MG gravity
       cosmo.w0_mg = cosmo.bg_i[1];
       cosmo.wa_mg = cosmo.bg_i[2];
 
-      COUT<<"The expansion parameters are: "<<"\033[1;32m Omega_smg= \033[0m" << cosmo.Omega_mg <<"\033[1;32m, w0_smg= \033[0m" << cosmo.w0_mg <<"\033[1;32m, wa_smg= \033[0m" << cosmo.wa_mg <<endl;
-      if (!parseParameter(params, numparam, "n_field_update",  sim.nKe_numsteps))
+      COUT<<"The expansion parameters are: "<<"\033[1;34m Omega_smg= \033[0m" << cosmo.Omega_mg <<"\033[1;34m, w0_smg= \033[0m" << cosmo.w0_mg <<"\033[1;34m, wa_smg= \033[0m" << cosmo.wa_mg <<endl;
+      if (!parseParameter(params, numparam, "n_mg_update",  cosmo.n_mg_numsteps))
       {
-        sim.nKe_numsteps = 1;
+        cosmo.n_mg_numsteps = 1;
       }
     }
   }
   //EFTevolution end
-
-
-// kessence part
-// Only if we have requested k-essence
-if (cosmo.MG_theory == 2)
-{
-if (parseParameter(params, numparam, "k-essence theory", par_string))
-{
-   if (par_string[0] == 'k' || par_string[0] == 'K')
-  {
-    cosmo.kessence_theory=1; // k-essence
-    COUT<<"The k-essence is set to \033[1;32m EFT of k-essence/k-evolution \033[0m"<<endl;
-  }
-  else if (par_string[0] == 'f' || par_string[0] == 'F' || par_string[0] == 'c' || par_string[0] == 'C')
-  {
-    cosmo.kessence_theory = 2; // k-essence model is covariant
-    COUT<<"The k-essence is set to \033[1;32m EFT_modeling in hiclass \033[0m"<<endl;
-  }
-  else  // default is
-  {
-    cosmo.kessence_theory = 1; //// The default is the EFT of k-essence
-    COUT<<"No k-essence model is specified! The k-essence model is set to default \033[1;32m EFT of k-essence/k-evolution \033[0m"<<endl;
-  }
-}
-}
-  // EFT k-essence
-if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 1 )
-{
-	if (!parseParameter(params, numparam, "cs2_kessence",  cosmo.cs2_kessence))
-	{
-			cosmo.cs2_kessence=1;
-	}
-	if (!parseParameter(params, numparam, "Omega_kessence",  cosmo.Omega_kessence))
-	{
-			cosmo.Omega_kessence=0.7199;
-	}
-	if (!parseParameter(params, numparam, "w_kessence",  cosmo.w_kessence))
-	{
-			cosmo.w_kessence=-0.9;
-	}
-  if (!parseParameter(params, numparam, "n_field_update",  sim.nKe_numsteps))
-  {
-    sim.nKe_numsteps = 1;
-  }
-  if (!parseParameter(params, numparam, "Kessence source gravity", sim.Kess_source_gravity))
-  {
-    sim.Kess_source_gravity = 0;
-  }
-  if (!parseParameter(params, numparam, "NL_kessence", sim.NL_kessence))
-  {
-    sim.NL_kessence = 0; //Default is linear kessence.
-  }
-}
-  //EFT kessence end
-
-// Covariant kessence
-  if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 2 )
-  {
-    COUT<<" \t MG theory is set to  \033[1;32m covariant k-essence \033[0m";
-
-   if (!parseParameter(params, numparam, "X_hat",  cosmo.X_hat))
-    {
-  			cosmo.X_hat=8;
-  	}
-  	if (!parseParameter(params, numparam, "g0",  cosmo.g0))
-  	{
-  			cosmo.g0=0.0;
-  	}
-  	if (!parseParameter(params, numparam, "g2",  cosmo.g2))
-  	{
-  			cosmo.g2=1.0;
-  	}
-    if (!parseParameter(params, numparam, "g4",  cosmo.g4))
-  	{
-  			cosmo.g4=0.1;
-  	}
-  }
-    // Covariant kessence end
-
-    // IC for the k-essence! IF we request for k-essence and the EFT approach and
-    if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 1  && ic.IC_MG == 1)
-    {
-      COUT << " initial conditions for kessence fields (pi,zeta) will be computed by the given file" << endl;
-      parseParameter(params, numparam, "T_kessence file", ic.tk_kessence);
-      if (!parseParameter(params, numparam, "T_kessence file", ic.tk_kessence))
-      {
-        if(parallel.isRoot())  cout << " \033[1;31merror:\033[0m"  << "\033[1;35m no file specified!\033[0m" <<endl;
-    #ifdef LATFIELD2_HPP
-          parallel.abortForce();
-    #endif
-      }
-    }
-      if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 1  && ic.IC_MG == 0)
-    {
-      COUT << " initial conditions for kessence fields (pi,zeta) will be computed using CLASS" << endl;
-    }
-
 
 	cosmo.num_ncdm = MAX_PCL_SPECIES-2;
 	if (!parseParameter(params, numparam, "m_ncdm", cosmo.m_ncdm, cosmo.num_ncdm))
@@ -1934,6 +1835,14 @@ if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 1 )
 
 	cosmo.Omega_rad = cosmo.Omega_g + cosmo.Omega_ur;
 
+  // No fld in the current implementation:
+  if(parseParameter(params, numparam, "omega_fld", cosmo.Omega_fld)|| parseParameter(params, numparam, "Omega_fld", cosmo.Omega_fld) || parseParameter(params, numparam, "w0_fld", cosmo.w0_fld) || parseParameter(params, numparam, "wa_fld", cosmo.wa_fld) || parseParameter(params, numparam, "cs2_fld", cosmo.wa_fld))
+  {
+    COUT << "\033[1;31m ERROR:\n";
+    COUT<< "In the current code you cannot add DE fluid. This implmenetation needs to be done carefully! \033[0m" << endl;
+    parallel.abortForce();
+  }
+
 	// if (parseParameter(params, numparam, "omega_fld", cosmo.Omega_fld))
 	// 	cosmo.Omega_fld /= cosmo.h * cosmo.h;
 	// else if (!parseParameter(params, numparam, "Omega_fld", cosmo.Omega_fld))
@@ -1994,7 +1903,7 @@ if (cosmo.MG_theory == 2 && cosmo.kessence_theory == 1 )
     // COUT << "Kessence source gravity = " << sim.Kess_source_gravity<< ", Non-linear kessence = " << sim.NL_kessence<< ", Number of kessence update = " <<sim.nKe_numsteps <<endl;
 		// COUT << " cosmological parameters are: Omega_m0 = " << cosmo.Omega_m << ", Omega_rad0 = " << cosmo.Omega_rad << ", h = " << cosmo.h << ", Omega_kessence0= "<<cosmo.Omega_kessence<<", w_kessence= "<<cosmo.w_kessence<<", cs^2 (kessence)= "<<cosmo.cs2_kessence<<endl;
 		// cosmo.Omega_Lambda = 1. - cosmo.Omega_m - cosmo.Omega_kessence - cosmo.Omega_rad;
-    cosmo.Omega_Lambda = 1. - cosmo.Omega_m - cosmo.Omega_kessence - cosmo.Omega_rad;
+    cosmo.Omega_Lambda = 1. - cosmo.Omega_m - cosmo.Omega_fld - cosmo.Omega_rad;
 	}
 
 	if(!parseParameter(params, numparam, "switch delta_rad", sim.z_switch_deltarad))

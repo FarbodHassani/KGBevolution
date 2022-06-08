@@ -38,15 +38,15 @@ using namespace std;
 //   pcls_ncdm      array of particle handlers for
 //                  non-cold DM (may be set to NULL)
 //   phi            pointer to allocated field
-//   pi_k           pointer to allocated field
-//   zeta         pointer to allocated field
+//   pi_mg           pointer to allocated field
+//   pi_mg_prime         pointer to allocated field
 //   chi            pointer to allocated field
 //   Bi             pointer to allocated field
 //   source         pointer to allocated field
 //   Sij            pointer to allocated field
-//   T00_Kess       pointer to allocated field
-//   T0i_Kess       pointer to allocated field
-//   Tij_Kess       pointer to allocated field
+//   T00_mg       pointer to allocated field
+//   T0i_mg       pointer to allocated field
+//   Tij_mg       pointer to allocated field
 //   scalarFT       pointer to allocated field
 //   BiFT           pointer to allocated field
 //   SijFT          pointer to allocated field
@@ -68,7 +68,7 @@ void writeSnapshots(metadata & sim, cosmology & cosmo, const double fourpiG, con
 #ifdef HAVE_CLASS_BG
 gsl_spline * H_spline, gsl_interp_accel * acc,
 #endif
-Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * pi_k, Field<Real> * zeta, Field<Real> * chi, Field<Real> * Bi, Field<Real> * T00_Kess, Field<Real> * T0i_Kess, Field<Real> * Tij_Kess, Field<Real> * source, Field<Real> * Sij, Field<Cplx> * scalarFT, Field<Cplx> * BiFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_phi, PlanFFT<Cplx> * plan_chi, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_source, PlanFFT<Cplx> * plan_Sij
+Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * pi_mg, Field<Real> * pi_mg_prime, Field<Real> * chi, Field<Real> * Bi, Field<Real> * T00_mg, Field<Real> * T0i_mg, Field<Real> * Tij_mg, Field<Real> * source, Field<Real> * Sij, Field<Cplx> * scalarFT, Field<Cplx> * BiFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_phi, PlanFFT<Cplx> * plan_chi, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_source, PlanFFT<Cplx> * plan_Sij
 #ifdef CHECK_B
 , Field<Real> * Bi_check, Field<Cplx> * BiFT_check, PlanFFT<Cplx> * plan_Bi_check
 #endif
@@ -117,11 +117,11 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 	if (sim.out_snapshot & MASK_PHI)
 		phi->saveHDF5_server_open(h5filename + filename + "_phi");
 
-	if (sim.out_snapshot & MASK_PI_K)
-			pi_k->saveHDF5_server_open(h5filename + filename + "_pi_k");
+	if (sim.out_snapshot & MASK_PI_MG)
+			pi_mg->saveHDF5_server_open(h5filename + filename + "_pi_mg");
 
-	if (sim.out_snapshot & MASK_ZETA)
-			zeta->saveHDF5_server_open(h5filename + filename + "_zeta");
+	if (sim.out_snapshot & MASK_PI_MG_PRIME)
+			pi_mg_prime->saveHDF5_server_open(h5filename + filename + "_pi_mg_prime");
 	//Kessence end
 
 
@@ -264,14 +264,14 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 #endif
 
 
-	if (sim.out_snapshot & MASK_PI_K)
+	if (sim.out_snapshot & MASK_PI_MG)
 #ifdef EXTERNAL_IO
-		pi_k->saveHDF5_server_write(NUMBER_OF_IO_FILES);
+		pi_mg->saveHDF5_server_write(NUMBER_OF_IO_FILES);
 #else
 		if (sim.downgrade_factor > 1)
-			pi_k->saveHDF5_coarseGrain3D(h5filename + filename + "_pi_k.h5", sim.downgrade_factor);
+			pi_mg->saveHDF5_coarseGrain3D(h5filename + filename + "_pi_mg.h5", sim.downgrade_factor);
 		else
-			pi_k->saveHDF5(h5filename + filename + "_pi_k.h5");
+			pi_mg->saveHDF5(h5filename + filename + "_pi_mg.h5");
 #endif
 
 	if (sim.out_snapshot & MASK_CHI)
@@ -385,25 +385,25 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 	}
 #endif
 //Kessence
-if (sim.out_snapshot & MASK_T_KESS)
+if (sim.out_snapshot & MASK_T_MG)
 {
-	// COUT<<"output kesssence energy"<<endl;
+	// COUT<<"output mg energy"<<endl;
 	#ifdef EXTERNAL_IO
-			T00_Kess->saveHDF5_server_write(NUMBER_OF_IO_FILES);
-			// T0i_Kess->saveHDF5_server_write(NUMBER_OF_IO_FILES);
-			// Tij_Kess->saveHDF5_server_write(NUMBER_OF_IO_FILES);
+			T00_mg->saveHDF5_server_write(NUMBER_OF_IO_FILES);
+			// T0i_mg->saveHDF5_server_write(NUMBER_OF_IO_FILES);
+			// Tij_mg->saveHDF5_server_write(NUMBER_OF_IO_FILES);
 	#else
 			if (sim.downgrade_factor > 1)
 			{
-				T00_Kess->saveHDF5_coarseGrain3D(h5filename + filename + "_T00_Kess.h5", sim.downgrade_factor);
-				// T0i_Kess->saveHDF5_coarseGrain3D(h5filename + filename + "_T0i_Kess.h5", sim.downgrade_factor);
-				// Tij_Kess->saveHDF5_coarseGrain3D(h5filename + filename + "_Tij_Kess.h5", sim.downgrade_factor);
+				T00_mg->saveHDF5_coarseGrain3D(h5filename + filename + "_T00_mg.h5", sim.downgrade_factor);
+				// T0i_mg->saveHDF5_coarseGrain3D(h5filename + filename + "_T0i_mg.h5", sim.downgrade_factor);
+				// Tij_mg->saveHDF5_coarseGrain3D(h5filename + filename + "_Tij_mg.h5", sim.downgrade_factor);
 			}
 			else
 			{
-				T00_Kess->saveHDF5(h5filename + filename + "_T00_Kess.h5");
-				// T0i_Kess->saveHDF5(h5filename + filename + "_T0i_Kess.h5");
-				// Tij_Kess->saveHDF5(h5filename + filename + "_Tij_Kess.h5");
+				T00_mg->saveHDF5(h5filename + filename + "_T00_mg.h5");
+				// T0i_mg->saveHDF5(h5filename + filename + "_T0i_mg.h5");
+				// Tij_mg->saveHDF5(h5filename + filename + "_Tij_mg.h5");
 			}
 	#endif
 }
@@ -1849,7 +1849,7 @@ void writeSpectra(metadata & sim, cosmology & cosmo, const double fourpiG, const
 #ifdef HAVE_CLASS
 background & class_background, perturbs & class_perturbs, icsettings & ic,
 #endif
-Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * pi_k ,Field<Real> * zeta, Field<Real> * chi, Field<Real> * Bi,  Field<Real> * T00_Kess, Field<Real> * T0i_Kess, Field<Real> * Tij_Kess, Field<Real> * source, Field<Real> * Sij, Field<Cplx> * scalarFT, Field<Cplx> * scalarFT_pi, Field<Cplx> * scalarFT_zeta, Field<Cplx> * BiFT, Field<Cplx> * T00_KessFT, Field<Cplx> * T0i_KessFT, Field<Cplx> * Tij_KessFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_phi, PlanFFT<Cplx> * plan_pi_k , PlanFFT<Cplx> * plan_zeta, PlanFFT<Cplx> * plan_chi, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_T00_Kess, PlanFFT<Cplx> * plan_T0i_Kess, PlanFFT<Cplx> * plan_Tij_Kess, PlanFFT<Cplx> * plan_source, PlanFFT<Cplx> * plan_Sij
+Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_cdm, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_b, Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_ncdm, Field<Real> * phi, Field<Real> * pi_mg ,Field<Real> * pi_mg_prime, Field<Real> * chi, Field<Real> * Bi,  Field<Real> * T00_mg, Field<Real> * T0i_mg, Field<Real> * Tij_mg, Field<Real> * source, Field<Real> * Sij, Field<Cplx> * scalarFT, Field<Cplx> * scalarFT_pi, Field<Cplx> * scalarFT_pi_mg_prime, Field<Cplx> * BiFT, Field<Cplx> * T00_mgFT, Field<Cplx> * T0i_mgFT, Field<Cplx> * Tij_mgFT, Field<Cplx> * SijFT, PlanFFT<Cplx> * plan_phi, PlanFFT<Cplx> * plan_pi_mg , PlanFFT<Cplx> * plan_pi_mg_prime, PlanFFT<Cplx> * plan_chi, PlanFFT<Cplx> * plan_Bi, PlanFFT<Cplx> * plan_T00_mg, PlanFFT<Cplx> * plan_T0i_mg, PlanFFT<Cplx> * plan_Tij_mg, PlanFFT<Cplx> * plan_source, PlanFFT<Cplx> * plan_Sij
 #ifdef CHECK_B
 , Field<Real> * Bi_check, Field<Cplx> * BiFT_check, PlanFFT<Cplx> * plan_Bi_check
 #endif
@@ -2042,32 +2042,30 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 	 //KESSENCE PART
 
    // Note that according to definition and since pi is dimensionfull, so in the output we write \pi * H_conf which is dimensionless and can be compared to class and hiclass
-	  if (sim.out_pk & MASK_PI_K)
+	  if (sim.out_pk & MASK_PI_MG)
 		{
-			plan_pi_k->execute(FFT_FORWARD);
+			plan_pi_mg->execute(FFT_FORWARD);
 			extractPowerSpectrum(*scalarFT_pi , kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);
-			sprintf(filename, "%s%s%03d_pi_k.dat", sim.output_path, sim.basename_pk, pkcount);
-      writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI, filename, "power spectrum of pi_k * H0  (dimensionless)", a, sim.z_pk[pkcount]);
-
-			// writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI/sqrt(2./3.*fourpiG)/sqrt(2./3.*fourpiG), filename, "power spectrum of pi_k * H0  (dimensionless)", a, sim.z_pk[pkcount]);
+			sprintf(filename, "%s%s%03d_pi_mg.dat", sim.output_path, sim.basename_pk, pkcount);
+      writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI/sqrt(2./3.*fourpiG)/sqrt(2./3.*fourpiG), filename, "power spectrum of pi_mg * H0  (dimensionless)", a, sim.z_pk[pkcount]);
 		}
 
-	     if (sim.out_pk & MASK_ZETA)
+	     if (sim.out_pk & MASK_PI_MG_PRIME)
 		{
-			plan_zeta->execute(FFT_FORWARD);
-			extractPowerSpectrum(*scalarFT_zeta, kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);
-			sprintf(filename, "%s%s%03d_zeta.dat", sim.output_path, sim.basename_pk, pkcount);
-			writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI, filename, "power spectrum of zeta (dimensionless)", a, sim.z_pk[pkcount]);
+			plan_pi_mg_prime->execute(FFT_FORWARD);
+			extractPowerSpectrum(*scalarFT_pi_mg_prime, kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);
+			sprintf(filename, "%s%s%03d_pi_mg_prime.dat", sim.output_path, sim.basename_pk, pkcount);
+			writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI, filename, "power spectrum of pi_mg_prime (dimensionless)", a, sim.z_pk[pkcount]);
 		}
 
-	   if (sim.out_pk & MASK_Delta_KESS)
+	   if (sim.out_pk & MASK_DELTA_MG)
 		{
 			// P (\delta)= deltarho_kess^2/ Omega_kess *a^(-3(1+w)) ) Omega_kess *a^(-3(1+w)) ) since in the defnition we have a^3 T00
 			// We already included a^(-3) in the denominator, so we only need take the rest into account.
-			plan_T00_Kess->execute(FFT_FORWARD);
-			extractPowerSpectrum(*T00_KessFT, kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);
-			sprintf(filename, "%s%s%03d_delta_kess.dat", sim.output_path, sim.basename_pk, pkcount);
-			writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI* cosmo.Omega_kessence * cosmo.Omega_kessence * pow(a, -3.* cosmo.w_kessence) * pow(a, -3.* cosmo.w_kessence), filename, "power spectrum of delta_kessence", a, sim.z_pk[pkcount]);
+			plan_pi_mg->execute(FFT_FORWARD);
+			extractPowerSpectrum(*T00_mgFT, kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);
+			sprintf(filename, "%s%s%03d_delta_mg.dat", sim.output_path, sim.basename_pk, pkcount);
+			writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI* cosmo.Omega_mg * cosmo.Omega_mg * pow(a, -3.* cosmo.w0_mg) * pow(a, -3.* cosmo.wa_mg), filename, "power spectrum of delta_mg", a, sim.z_pk[pkcount]);
 		 }
 
      // Phi_prime is dimensionful so we divide  to Hconf to make dimensionless!
@@ -2159,17 +2157,17 @@ Particles_gevolution<part_simple,part_simple_info,part_simple_dataType> * pcls_c
 			writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI * (cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) * (cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)), filename, "power spectrum of delta", a, sim.z_pk[pkcount]);
 		}
 
-    //Kessence Cross Power delta_kess * delta_m
-    // cout<<"MASK_DELTAKESS_DELTA: "<<MASK_DELTAKESS_DELTA<<"MASK_Delta_KESS: "<<MASK_Delta_KESS<<endl;
-    if ( sim.gr_flag > 0 && sim.out_pk & MASK_Delta_KESS && sim.out_pk & MASK_DELTAKESS_DELTA  && sim.out_pk & MASK_Delta_KESS)
-    {
-       // P (\deltam \delta_kess)= deltarho_kess * \delta_m / Omega_kess *a^(-3(1+w)) ) Omega_m *a^-3 since in the defnition we have a^3 T00
-       // We already included a^(-3) in the denominator, so we only need take the rest into account.
-       // Which are just a^{-3w} and Omega_kess and Omega_m
-      extractCrossSpectrum(*scalarFT, *T00_KessFT, kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);
-      sprintf(filename, "%s%s%03d_deltakess_deltam.dat", sim.output_path, sim.basename_pk, pkcount);
-      writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI * (cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) * cosmo.Omega_kessence *  pow(a, -3.* cosmo.w_kessence)  , filename, "cross power spectrum of delta_m and  delta_kess", a, sim.z_pk[pkcount]);
-    }
+    // //Kessence Cross Power delta_kess * delta_m
+    // // cout<<"MASK_DELTAKESS_DELTA: "<<MASK_DELTAKESS_DELTA<<"MASK_Delta_KESS: "<<MASK_Delta_KESS<<endl;
+    // if ( sim.gr_flag > 0 && sim.out_pk & MASK_Delta_KESS && sim.out_pk & MASK_DELTAKESS_DELTA  && sim.out_pk & MASK_Delta_KESS)
+    // {
+    //    // P (\deltam \delta_kess)= deltarho_kess * \delta_m / Omega_kess *a^(-3(1+w)) ) Omega_m *a^-3 since in the defnition we have a^3 T00
+    //    // We already included a^(-3) in the denominator, so we only need take the rest into account.
+    //    // Which are just a^{-3w} and Omega_kess and Omega_m
+    //   extractCrossSpectrum(*scalarFT, *T00_mgFT, kbin, power, kscatter, pscatter, occupation, sim.numbins, true, KTYPE_LINEAR);
+    //   sprintf(filename, "%s%s%03d_deltakess_deltam.dat", sim.output_path, sim.basename_pk, pkcount);
+    //   writePowerSpectrum(kbin, power, kscatter, pscatter, occupation, sim.numbins, sim.boxsize, (Real) numpts3d * (Real) numpts3d * 2. * M_PI * M_PI * (cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo)) * cosmo.Omega_kessence *  pow(a, -3.* cosmo.w_kessence)  , filename, "cross power spectrum of delta_m and  delta_kess", a, sim.z_pk[pkcount]);
+    // }
 
 		if (cosmo.num_ncdm > 0 || sim.baryon_flag)
 		{

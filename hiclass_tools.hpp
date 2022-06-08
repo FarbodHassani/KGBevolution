@@ -58,14 +58,14 @@ void initializeCLASSstructures(metadata & sim, icsettings & ic, cosmology & cosm
 	int recfast_Nz0;
 	int i;
   int num_entries;
-  if (cosmo.MG_theory == 1)
+  if (cosmo.theory_mg == 1)
   {
     num_entries = 34; // If we have EFT theory we have to read 34 class params
   }
-  else
-  {
-    num_entries = 26;
-  }
+  // else
+  // {
+  //   num_entries = 26;
+  // }
 
 #ifdef CLASS_K_PER_DECADE_FOR_PK
 	int k_per_decade_for_pk;
@@ -191,7 +191,7 @@ void initializeCLASSstructures(metadata & sim, icsettings & ic, cosmology & cosm
   sprintf(class_filecontent.name[i], "skip_stability_tests_smg");
   sprintf(class_filecontent.value[i++],"no");
 // EFT
-if (cosmo.MG_theory == 1)
+if (cosmo.theory_mg == 1)
 {
   sprintf(class_filecontent.name[i], "Omega_Lambda");
   sprintf(class_filecontent.value[i++], "%d", 0);
@@ -373,12 +373,6 @@ if (cosmo.MG_theory == 1)
 		parallel.abortForce();
 	}
 
-	// if (thermodynamics_free(&class_thermo) == _FAILURE_)
-	// {
-	// 	COUT << " error: calling thermodynamics_free from hiclass library failed!" << endl << " following error message was passed: " << class_thermo.error_message << endl;
-	// 	parallel.abortForce();
-	// }
-
 	COUT << endl << " hiclass structures initialized successfully." << endl;
 }
 
@@ -443,7 +437,11 @@ void freeCLASSstructures(background & class_background, thermo & class_thermo, p
 // Returns:
 //
 //////////////////////////
-void loadTransferFunctions(background & class_background, perturbs & class_perturbs, gsl_spline * & tk_delta, gsl_spline * & tk_theta, const char * qname, const double boxsize, const double z, double h , double Hconf_class, double Omega_m, double Omega_smg ,double Omega_rad,  double w_smg)
+void loadTransferFunctions(background & class_background, perturbs & class_perturbs, gsl_spline * & tk_delta, gsl_spline * & tk_theta, const char * qname, const double boxsize, const double z, double h
+  #ifdef HAVE_CLASS_BG
+  , const double Hconf_class, const double Omega_m, const double Omega_mg, const double Omega_rad,  const double w_mg
+  #endif
+)
 {
   int cols = 0, dcol = -1, tcol = -1, kcol = -1, phicol = -1, psicol= -1, etacol= -1, h_primecol= -1, eta_primecol= -1;
   double alpha, alpha_prime;
@@ -464,38 +462,33 @@ void loadTransferFunctions(background & class_background, perturbs & class_pertu
 	{
 		sprintf(dname, "vx_smg");
 		sprintf(tname, "vx_prime_smg");
-		h /= boxsize;
   }
-
 	else if (qname != NULL)
 	{
 		sprintf(dname, "d_%s", qname);
 		sprintf(tname, "t_%s", qname);
-		h /= boxsize;
   }
-	else
+  else if (qname == NULL)
 	{
-		sprintf(dname, "phi");
-		sprintf(tname, "psi");
-		h = 1.;
+    COUT << " error in loadTransferFunctions (HAVE_CLASS)! why phi/psi columns are requested?! The radiation perturbation part should be implemented and tested!" << endl;
+		parallel.abortForce();
 	}
 	sprintf(kname, "k (h/Mpc)");
-
 
 	ptr = strtok(coltitles, _DELIMITER_);
 	while (ptr != NULL)
 	{
     if (strncmp(ptr, dname, strlen(dname)) == 0) dcol = cols;
-		else if (strncmp(ptr, tname, strlen(tname)) == 0) tcol = cols;
-		else if (strncmp(ptr, kname, strlen(kname)) == 0) kcol = cols;
-    // quintessence gauge transformation
+    else if (strncmp(ptr, tname, strlen(tname)) == 0) tcol = cols;
+    else if (strncmp(ptr, kname, strlen(kname)) == 0) kcol = cols;
+    // gauge transformation
     else if (strncmp(ptr, "phi", strlen("phi")) == 0) phicol = cols;
     else if (strncmp(ptr, "psi", strlen("psi")) == 0) psicol = cols;
     else if (strncmp(ptr, "eta_prime", strlen("eta_prime")) == 0) eta_primecol = cols;
     else if (strncmp(ptr, "eta", strlen("eta")) == 0) etacol = cols;
     else if (strncmp(ptr, "h_prime", strlen("h_prime")) == 0) h_primecol = cols;
-		cols++;
-    	ptr = strtok(NULL, _DELIMITER_);
+    cols++;
+      ptr = strtok(NULL, _DELIMITER_);
   }
 
 	if (dcol < 0 || (tcol < 0 && strncmp(qname,"cdm",strlen("cdm")) != 0 ) || kcol < 0 || (qname != NULL && (phicol < 0 || psicol < 0 || etacol < 0 || h_primecol < 0 || eta_primecol < 0) ) )
@@ -513,49 +506,52 @@ void loadTransferFunctions(background & class_background, perturbs & class_pertu
 
 	for (int i = 0; i < class_perturbs.k_size[class_perturbs.index_md_scalars]; i++)
 	{
-		k[i] = data[i*cols + kcol] * boxsize;
-		tk_d[i] = data[i*cols + dcol];
-    if (strncmp(qname,"cdm",strlen("cdm")) != 0)
-    {
-		  tk_t[i] = data[i*cols + tcol] / h;
-    }
-    else
-    {
-      tk_t[i] = 0.;
-    }
-
+    k[i] = data[i*cols + kcol] * boxsize;
+    alpha = (data[i*cols + h_primecol] + 6.0*data[i*cols + eta_primecol])/(2.0*data[i*cols + kcol]*data[i*cols + kcol]*h*h);// Note that in hiclass k and time derivative do not have the same unit, there is an h difference which is corrected. prime is [1/Mpc] while k[h/Mpc] and k*h give in 1/Mpc
+    alpha_prime = data[i*cols + psicol] + data[i*cols + phicol] - data[i*cols + etacol];
     if (strncmp(qname,"vx",strlen("vx")) == 0)
      {
-       alpha = (data[i*cols + h_primecol] + 6.0*data[i*cols + eta_primecol])/(2.0*data[i*cols + kcol]*data[i*cols + kcol]);
-       alpha_prime =data[i*cols + psicol] + data[i*cols + phicol] - data[i*cols + etacol];
-       // tk_d[i] += alpha ;
-       tk_t[i] = data[i*cols + tcol];
-       // tk_t[i] += alpha_prime ;
+      tk_d[i] = data[i*cols + dcol] + alpha; // gauge correction NOTE that v_x is in [1/Mpc]
+      tk_t[i] = data[i*cols + tcol] + alpha_prime;// gauge correction
      }
 
-    else if (qname != NULL)
+    else if (strncmp(qname,"cdm",strlen("cdm")) == 0) // tk_t cdm is 0 in sync gauge!
     {
-      alpha  = (data[i*cols + h_primecol] + 6.0*data[i*cols + eta_primecol])/(2.0*data[i*cols + kcol]*data[i*cols + kcol]);
-      alpha_prime =  data[i*cols + psicol] + data[i*cols + phicol] - data[i*cols + etacol];
-      tk_t[i] +=  alpha * data[i*cols + kcol]*data[i*cols + kcol] / h;
-      if (strncmp(qname,"g",strlen("g")) || strncmp(qname,"ncdm",strlen("ncdm")) == 0)
-      {
-        tk_d[i] += -alpha * 4. * Hconf_class;
-      }
-      else if (strncmp(qname,"cdm",strlen("cdm")) == 0)
-      {
-        tk_d[i] += -alpha * 3. * Hconf_class;
-      }
-      else if (strncmp(qname,"b",strlen("b")) == 0)
-      {
-        tk_d[i] += -alpha * 3. * Hconf_class;
-      }
-      else if (strncmp(qname,"tot",strlen("tot")) == 0)
-      {
-        tk_d[i] += -alpha * 3. * Hconf_class * (Omega_m + 4. * Omega_rad/3. + Omega_smg * (1. + w_smg));
-      }
+      tk_d[i] = data[i*cols + dcol] - alpha * 3. * Hconf_class; // gauge correction; [alpha]=Mpc and H[1/Mpc]!
+      tk_t[i] = (alpha * data[i*cols + kcol] * h * data[i*cols + kcol] * h) * boxsize/h;// gauge correction + converting in gevolution!
+      // boxsize/h --> unit in Mpc
+      // k *h --> 1/Mpc
+      // alpha is in 1/Mpc
+      // unit as tk_t in hiclass is 1/Mpc and alpha = (h_prime[1/Mpc] + 6.*eta_prime[1/Mpc])/(2.*k[h/Mpc]*h*k[h/Mpc]*h); Results in  [alpha] = Mpc and [alpha k*h * k *h] = Mpc * 1/Mpc^2 = 1/Mpc
+      // Also note that tk_t[i] is in 1/Mpc in class
+      // boxsize[Mpc/h] / h give boxsize in Mpc. so at the end we have tk_t in gevolution without unit.
     }
-
+    else if (strncmp(qname,"b",strlen("b")) == 0)
+    {
+      tk_d[i] = data[i*cols + dcol] - alpha * 3. * Hconf_class;
+      tk_t[i] = (data[i*cols + tcol] + alpha * data[i*cols + kcol] * h * data[i*cols + kcol] * h) * boxsize/h;
+    }
+    // else if (strncmp(qname,"fld",strlen("fld")) != 0)
+    // {
+    //   tk_d[i] = data[i*cols + dcol] - alpha * 3. * (1+ w_fld) * Hconf_class;
+    //   tk_t[i] = (data[i*cols + tcol] + alpha * data[i*cols + kcol] * h * data[i*cols + kcol] * h) * boxsize/h;
+    // }
+    else if (strncmp(qname,"g",strlen("g")) == 0)
+    {
+      tk_d[i] = data[i*cols + dcol] - alpha * 4. * Hconf_class;
+      tk_t[i] = (data[i*cols + tcol] + alpha * data[i*cols + kcol] * h * data[i*cols + kcol] * h) * boxsize/h;
+    }
+    else if (strncmp(qname,"ur",strlen("ur")) == 0)
+    {
+      tk_d[i] = data[i*cols + dcol] - alpha * 4. * Hconf_class;
+      tk_t[i] = (data[i*cols + tcol] + alpha * data[i*cols + kcol] * h * data[i*cols + kcol] * h) * boxsize/h;
+    }
+    else if (strncmp(qname,"tot",strlen("tot")) == 0)
+    {
+      tk_d[i] = data[i*cols + dcol] - alpha * 3 * (Omega_mg * (1. + w_mg) + Omega_m + Omega_rad * (1.+1./3.)) * Hconf_class;
+      // Omega_fld*(1. + w_fld)  fld part is not included!
+      tk_t[i] = (data[i*cols + tcol] + alpha * data[i*cols + kcol] * h * data[i*cols + kcol] * h) * boxsize/h;
+    }
 		if (i > 0)
 		{
 			if (k[i] < k[i-1])
@@ -608,8 +604,9 @@ void loadBGFunctions(background & class_background, gsl_spline * & bg_data, cons
 	double * bg;
 	double * data;
 	char * ptr;
+  int num_points=30;
 	int bg_size=0;
-	double dz=0.05;
+  double dz=0.005/num_points;
   double z1,z2;
 
 	// Get the names of the background variables as a single string
@@ -620,25 +617,12 @@ void loadBGFunctions(background & class_background, gsl_spline * & bg_data, cons
 	ptr = strtok(coltitles, _DELIMITER_);
 	while (ptr != NULL)
 	{
-    if (strncmp(ptr, zname, strlen(zname)) == 0) zcol = cols;
-
-    if (strncmp(qname,"phi\'\'",strlen("phi\'\'")) == 0)
-      {
-        if (strncmp(ptr, qname, strlen(qname)) == 0) {bgcol = cols; bgcol2 = bgcol; }
-      }
-    else
-      {
-  		if (strncmp(ptr, qname, strlen(qname)) == 0) bgcol = cols;
+  		if ((strncmp(ptr, qname, strlen(qname)) == 0) && (strlen(qname)== strlen(ptr))) bgcol = cols;
   		if (strncmp(ptr, zname, strlen(zname)) == 0) zcol = cols;
-      }
-
       cols++;
       ptr = strtok(NULL, _DELIMITER_);
 	}
-  if (strncmp(qname,"phi\'",strlen("phi\'")) == 0 && bgcol2<0)
-  {
-    bgcol = bgcol-1;
-  }
+
 	if (bgcol < 0 || zcol < 0)
 	{
 		COUT << " error in loadBGFunctions (HAVE_CLASS)! Unable to identify requested columns!" << endl;
@@ -653,17 +637,16 @@ void loadBGFunctions(background & class_background, gsl_spline * & bg_data, cons
   }
 
 	background_output_data(&class_background, cols, data);
-	for(bg_size=0;data[bg_size*cols + zcol]>z_in * 1.1;bg_size++){};
 
-	a = (double *) malloc(sizeof(double) * (class_background.bt_size-bg_size+1));
-	bg = (double *) malloc(sizeof(double) * (class_background.bt_size-bg_size+1));
+  a = (double *) malloc(sizeof(double) * (class_background.bt_size-bg_size+num_points));
+  bg = (double *) malloc(sizeof(double) * (class_background.bt_size-bg_size+num_points));
 	if(!a || !bg)
   {
     COUT << " error in loadBGFunctions (HAVE_CLASS_BG)! Unable to allocate memory!" << endl;
     parallel.abortForce();
   }
 
-	for (int i = bg_size; i < class_background.bt_size; i++)
+  for (int i = bg_size; i < class_background.bt_size; i++)
 	{
 		a[i-bg_size] = 1. / (1. + data[i*cols + zcol]);
 		bg[i-bg_size] = data[i*cols + bgcol];
@@ -676,17 +659,18 @@ void loadBGFunctions(background & class_background, gsl_spline * & bg_data, cons
 			}
 		}
 	}
-
-	z1 = 1./a[class_background.bt_size-bg_size-1] -1.;
-	z2 = 1./a[class_background.bt_size-bg_size-2] -1.;
-	a[class_background.bt_size-bg_size] = 1./(1.+z1-dz);
-	bg[class_background.bt_size-bg_size] = bg[class_background.bt_size-bg_size-1] - dz *(bg[class_background.bt_size-bg_size-1] -  bg[class_background.bt_size-bg_size-2])/(z1 - z2);
-
+  for (int i=0;i<num_points;i++)
+  {
+    z1 = 1./a[class_background.bt_size-bg_size+i-1] -1.;
+    z2 = 1./a[class_background.bt_size-bg_size+i-2] -1.;
+    a[class_background.bt_size-bg_size+i] =  a[class_background.bt_size-bg_size+i-1] + 1./(1.+dz);
+    bg[class_background.bt_size-bg_size+i] = bg[class_background.bt_size-bg_size+i-1] - dz *(bg[class_background.bt_size-bg_size+i-1] -  bg[class_background.bt_size-bg_size+i-2])/(z1 - z2);
+  }
 	free(data);
 
-	bg_data = gsl_spline_alloc(gsl_interp_cspline, class_background.bt_size-bg_size+1);
+  bg_data = gsl_spline_alloc(gsl_interp_cspline, class_background.bt_size-bg_size+num_points);
 
-	gsl_spline_init(bg_data, a, bg, class_background.bt_size-bg_size+1);
+	gsl_spline_init(bg_data, a, bg, class_background.bt_size-bg_size+num_points);
 
 	free(a);
 	free(bg);
