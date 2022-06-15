@@ -511,8 +511,8 @@ void loadTransferFunctions(background & class_background, perturbs & class_pertu
     alpha_prime = data[i*cols + psicol] + data[i*cols + phicol] - data[i*cols + etacol];
     if (strncmp(qname,"vx",strlen("vx")) == 0)
      {
-      tk_d[i] = data[i*cols + dcol] + alpha; // gauge correction NOTE that v_x is in [1/Mpc]
-      tk_t[i] = data[i*cols + tcol] + alpha_prime;// gauge correction
+      tk_d[i] = data[i*cols + dcol]/a + alpha; // gauge correction NOTE that v_x is in [1/Mpc] and pi(Newt)[hiclass unit] = V_x/a +alpha where pi(sync) =  V_x/a
+      tk_t[i] = data[i*cols + tcol]/a - Hconf_class *  data[i*cols + dcol]/a + alpha_prime;// gauge correction where pi'(Newt)[hiclass unit==1] = V'_x/a - Hconf V_x/a +alpha'
      }
 
     else if (strncmp(qname,"cdm",strlen("cdm")) == 0) // tk_t cdm is 0 in sync gauge!

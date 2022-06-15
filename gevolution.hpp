@@ -546,7 +546,7 @@ template <class FieldType>
 void update_pi_prime_EFT(double dtau, double dx, double a, double fourpiG, double H0_hiclass, Field<FieldType> & phi, Field<FieldType> & phi_old, Field<FieldType> & chi, Field<FieldType> & chi_old, Field<FieldType> & pi, Field<FieldType> & pi_prime, Field<FieldType> & deltaPm, double Hconf, double Hconf_prime, double Hconf_prime_prime, double rho_s, double P_s, double P_s_prime, double alpha_K, double alpha_B, double alpha_K_prime, double alpha_B_prime)
   {
   double RHS, Laplace_pi, Laplace_chi, Laplace_phi; // psi = phi - chi
-  double A_Laplace_chi, A_Laplace_phi, A_pi_prime_prime, A_chi_prime, A_deltaPm, A_phi_prime, A_Laplace_pi, A_pi_prime, A_chi, A_phi, A_pi ;
+  double A_pi_prime_prime, A_pi_prime, A_pi, A_Laplace_pi, A_phi_prime, A_phi, A_Laplace_phi, A_chi_prime, A_chi, A_Laplace_chi, A_deltaPm;
   double Mpl2 = 1./(2. * fourpiG); //   fourpiG   1/2 Mpl^2 in the code unit
   double density_norm = 3.0 *  (2./3.*fourpiG)/(H0_hiclass * H0_hiclass); // densities and pressures in hiclass are in [1/Mpc^2] and H[1/Mpc] so to make it dimensionless we have rho[1/Mpc^2]/H[1/Mpc]^2 and then we multiply to H_gev^2 to go to gevolution units!
   rho_s = rho_s * density_norm; // To make it in gevolution units, also densities in hiclass alre multiplied by 8 * pi G/3.
@@ -556,35 +556,22 @@ void update_pi_prime_EFT(double dtau, double dx, double a, double fourpiG, doubl
   P_s_prime= P_s_prime * density_norm * sqrt(2./3.*fourpiG)/H0_hiclass; // density norm as well as the derivative unit consideration
   Hconf_prime = Hconf_prime_prime * (2./3.*fourpiG)/H0_hiclass/H0_hiclass; // H[1/Mpc^2]
   Hconf_prime_prime = Hconf_prime_prime * (2./3.*fourpiG)* sqrt(2./3.*fourpiG)/H0_hiclass/H0_hiclass/H0_hiclass; // H''[1/Mpc^3]
-  A_Laplace_chi = alpha_B * Hconf;
-  A_Laplace_phi = -alpha_B * Hconf;
-  A_pi_prime_prime = (3. * alpha_B * alpha_B /2. + alpha_K) * Hconf* Hconf;
-  A_chi_prime = (3. * alpha_B * alpha_B /2. + alpha_K) * Hconf* Hconf;
-  A_deltaPm = -3.0 * alpha_B * Hconf * a * a/(2.0 * Mpl2);
-  A_phi_prime =  3. * Hconf * Hconf * (alpha_B - alpha_B * alpha_B/2. - alpha_K/3. - alpha_B_prime/Hconf - alpha_B * Hconf_prime/Hconf/Hconf -  a * a * (rho_s + P_s)/(Mpl2 * Hconf * Hconf));
-  A_Laplace_pi = - (Hconf * alpha_B_prime + alpha_B * Hconf_prime) - a * a * (rho_s + P_s)/Mpl2;
-  A_pi_prime = 3. * Hconf * Hconf * Hconf * (3. * alpha_B * alpha_B/2. + 2. * alpha_K/3.
-                + alpha_B * alpha_B_prime/(2. * Hconf) + 2. * alpha_K_prime/(3. * Hconf)
-                +  alpha_B * alpha_B * Hconf_prime/(2. * Hconf * Hconf) + 2. * alpha_K * Hconf_prime/(3. * Hconf * Hconf)
-                +  ( Hconf * Hconf + Hconf_prime) - a * a * alpha_B *  (rho_s + P_s)/(2. * Hconf * Hconf* Mpl2));
-  // (3./2.) * Hconf * Hconf * Hconf * alpha_B * alpha_B * (3. + alpha_B_prime/(Hconf * alpha_B) + Hconf_prime/Hconf/Hconf - a * a *  (rho_s + P_s)/(Hconf * Hconf * Mpl2 * alpha_B)) + 2. * alpha_K * Hconf * Hconf * Hconf * (1. + alpha_K_prime/2./alpha_K/Hconf + Hconf_prime/Hconf/Hconf);
-  // 3. * Hconf * Hconf * Hconf * (3. * alpha_B * alpha_B/2. + 2. * alpha_K/3.
-  //               + alpha_B * alpha_B_prime/(2. * Hconf) + 2. * alpha_K_prime/(3. * Hconf)
-  //               +  alpha_B * alpha_B * Hconf_prime/(2. * Hconf * Hconf) + 2. * alpha_K * Hconf_prime/(3. * Hconf * Hconf)
-  //               +  ( Hconf * Hconf + Hconf_prime) - a * a * alpha_B *  (rho_s + P_s)/(2. * Hconf * Hconf* Mpl2));
 
-  A_chi = 3. * Hconf * Hconf * Hconf * (-alpha_B +  alpha_B * alpha_B + alpha_K/3.
-                +  alpha_B_prime/Hconf + alpha_B * alpha_B_prime/(2. * Hconf) + alpha_K_prime/(3. * Hconf)
-                +  alpha_B * Hconf_prime/(Hconf * Hconf)
-                + alpha_B * alpha_B * Hconf_prime/(2. * Hconf * Hconf) + 2. * alpha_K * Hconf_prime/(3. * Hconf * Hconf)
-                 + a * a * (1 - alpha_B/2.) *  (rho_s + P_s)/( Hconf * Hconf* Mpl2));
- A_phi = 3. * Hconf * Hconf * Hconf * (-alpha_B +  alpha_B * alpha_B + alpha_K/3.
-               +  alpha_B_prime/Hconf + alpha_B * alpha_B_prime/(2. * Hconf) + alpha_K_prime/(3. * Hconf)
-               +  alpha_B * Hconf_prime/(Hconf * Hconf)
-               + alpha_B * alpha_B * Hconf_prime/(2. * Hconf * Hconf) + 2. * alpha_K * Hconf_prime/(3. * Hconf * Hconf)
-                + a * a * (1 - alpha_B/2.) *  (rho_s + P_s)/( Hconf * Hconf* Mpl2));
+  A_pi_prime_prime = (3. * alpha_B * alpha_B /2. + alpha_K);
+  //
+  A_pi_prime = 9. * alpha_B * alpha_B * Hconf/2. + 2. * alpha_K * Hconf +  3. * alpha_B * alpha_B_prime/2. + alpha_K_prime + (3. * alpha_B * alpha_B/2. + 2. * alpha_K) * Hconf_prime/Hconf  - 3. * a * a * alpha_B *  (rho_s + P_s)/(2. * Hconf * Mpl2);
+  //
+  A_pi = (3.0 * alpha_B * alpha_B + alpha_K) * Hconf * Hconf + 3. * Hconf * alpha_B * (-Hconf_prime_prime/(Hconf * Hconf) + alpha_B_prime/2. + 3. * Hconf_prime/Hconf + alpha_B * Hconf_prime/Hconf - Hconf_prime * Hconf_prime/Hconf/Hconf/Hconf) + 3. * Hconf * alpha_B_prime * (1 + Hconf_prime/Hconf) + Hconf * alpha_K_prime + 3. * alpha_K * Hconf_prime +  (3. * a * a/Mpl2) * ( (1. - alpha_B/2. - Hconf_prime/Hconf/Hconf) * (rho_s + P_s) + alpha_B * P_s_prime /2./Hconf);
+  A_Laplace_phi = -alpha_B/Hconf;
+  A_phi_prime = -alpha_K +  3. * alpha_B * (1. - alpha_B/2. - Hconf_prime/Hconf/Hconf) + 3. * alpha_B_prime/Hconf -  3.0 * a * a * (rho_s + P_s)/(Mpl2 * Hconf * Hconf);
+  A_phi = - Hconf * alpha_K - alpha_K_prime - 2. * alpha_K * Hconf_prime/Hconf + 3. * alpha_B * Hconf * (1. - alpha_B - alpha_B_prime/2./Hconf - (1. + alpha_B/2.) * Hconf_prime/Hconf/Hconf) - 3. * alpha_B_prime -  3.0 * a * a * (1 - alpha_B/2.) *  (rho_s + P_s)/( Hconf * Mpl2);
+  A_Laplace_pi = - (Hconf * alpha_B_prime + alpha_B * Hconf_prime)/Hconf/Hconf - a * a * (rho_s + P_s)/(Mpl2 * Hconf * Hconf);
+  //*****//
+  A_chi_prime = 3. * alpha_B * alpha_B /2. + alpha_K;
+  A_chi = -A_phi;
+  A_Laplace_chi = alpha_B/Hconf;
+  A_deltaPm = -3.0 * alpha_B * a * a/(2.0 * Mpl2 * Hconf);
 
-  A_pi = 3.0 * Hconf * Hconf * Hconf * Hconf * (alpha_B * alpha_B + alpha_K/3. - alpha_B * Hconf_prime_prime/(Hconf * Hconf * Hconf) + alpha_B_prime/Hconf + alpha_B * alpha_B_prime/(2. * Hconf) + alpha_K_prime/(3. * Hconf) + 3. * alpha_B * Hconf_prime/(Hconf * Hconf) + alpha_B * alpha_B * Hconf_prime/(Hconf * Hconf) + alpha_K * Hconf_prime/(Hconf * Hconf) - alpha_B_prime * Hconf_prime/(Hconf * Hconf * Hconf) - alpha_B * Hconf_prime * Hconf_prime/(Hconf * Hconf * Hconf * Hconf) +  a * a * (1. - alpha_B/2.) * (rho_s + P_s)/( Hconf * Hconf* Mpl2)  - a * a * (rho_s * Hconf_prime + P_s * Hconf_prime + P_s_prime * alpha_B/2.)/( Hconf * Hconf * Hconf * Hconf * Mpl2) );
 
   Site x(pi.lattice());
   for (x.first(); x.test(); x.next())
@@ -613,9 +600,9 @@ void update_pi_prime_EFT(double dtau, double dx, double a, double fourpiG, doubl
       Laplace_phi+=phi(x+2) + phi(x-2) - 2. * phi(x);
       Laplace_phi= Laplace_phi/(dx*dx);
 
-      RHS = -(A_pi * pi(x) +  A_chi * chi(x) + A_phi * phi(x) + A_pi_prime * pi_prime(x) + A_chi_prime * (chi(x) -chi_old(x))/dtau  + A_phi_prime * (phi(x) - phi_old(x))/dtau + A_Laplace_pi * Laplace_pi + A_Laplace_chi * Laplace_chi  + A_Laplace_phi * Laplace_phi) + A_deltaPm * deltaPm(x); // We have to remove phi'' from the equations!
+      RHS = -(A_pi_prime * pi_prime(x) + A_pi * pi(x) + A_Laplace_pi * Laplace_pi  + A_phi_prime * (phi(x) - phi_old(x))/dtau +  A_phi * phi(x) +  A_Laplace_phi * Laplace_phi + A_chi_prime * (chi(x) -chi_old(x))/dtau +  A_chi * chi(x) + A_Laplace_chi * Laplace_chi + A_deltaPm * deltaPm(x)); // We have to remove phi'' from the equations!
     // pi_prime(x) = pi_prime(x) * (1. - dtau * A_pi_prime/(A_pi_prime_prime)) - (dtau/(A_pi_prime_prime * (1 + dtau * A_pi_prime/(2.0 * A_pi_prime_prime)) ) ) * RHS;
-    pi_prime(x) = pi_prime(x)  +  RHS * dtau;
+    pi_prime(x) = pi_prime(x)  +  RHS * dtau/A_pi_prime_prime;
 
 
 // TEST:

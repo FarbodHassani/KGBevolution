@@ -2116,8 +2116,9 @@ double Hconf_class = gsl_spline_eval(H_spline, a, acc) * a; // H_hiclass * a (in
       for (i = 0; i < npts; i++)
       {
         k_mg[i] = tk_d_mg->x[i];
-        pi_mg_val = (tk_d_mg->y[i] /a) * (Hconf_class/Hc); // pi(k) (gev) [Time] = V_X(k) [hiclass][Time]/a  * H(class)/H(gev)
-        pi_mg_prime_val = (tk_t_mg->y[i] /a) - (tk_d_mg->y[i] /a) * Hconf_class; //pi'(k)[1] = V_X'(k)/a - Hconf(class) * V_x(k)/a
+        pi_mg_val = (tk_d_mg->y[i]) * (Hconf_class/Hc); // pi(k) (gev) [Time] = pi(k) (hiclass) [Time] [hiclass][Time]/a  * H(class)/H(gev);
+        // where pi(k) (hiclass) [Time] =  V_X(k) [hiclass][Time]/a
+        pi_mg_prime_val = tk_t_mg->y[i]; //pi'(k)[1] = V_X'(k)/a - Hconf(class) * V_x(k)/a which is done in the hiclass_tools
         pi_mg_k[i] =  - M_PI * pi_mg_val * sqrt( Pk_primordial(tk_d_mg->x[i] * cosmo.h / sim.boxsize, ic)/ tk_d_mg->x[i])/ tk_d_mg->x[i];
         pi_mg_prime_k[i] = - M_PI * pi_mg_prime_val * sqrt( Pk_primordial(tk_t_mg->x[i] * cosmo.h / sim.boxsize,ic)/ tk_t_mg->x[i])/ tk_t_mg->x[i];
       }
